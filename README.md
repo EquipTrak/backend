@@ -26,15 +26,27 @@ Com um MySQL já instalado, sem Docker:
 SPRING_PROFILES_ACTIVE=mysql DB_USUARIO=root DB_SENHA=sua-senha ./gradlew bootRun
 ```
 
-Para criar o primeiro administrador em desenvolvimento, adicione o perfil `dev` e defina a senha:
+Para criar usuários de demonstração em desenvolvimento, adicione o perfil `dev` e defina a senha deles:
 
 ```bash
-SPRING_PROFILES_ACTIVE=mysql,dev EQUIPTRACK_ADMIN_SENHA=sua-senha ./gradlew bootRun
+SPRING_PROFILES_ACTIVE=mysql,dev EQUIPTRACK_DEV_SENHA=sua-senha ./gradlew bootRun
 ```
 
-O administrador usa o e-mail `admin@equiptrack.local`, que pode ser alterado em `EQUIPTRACK_ADMIN_EMAIL`.
+Todos usam a mesma senha:
+
+| E-mail | Perfil |
+|---|---|
+| `admin@equiptrack.local` | Administrador |
+| `marina.souza@equiptrack.local` | Operador |
+| `rafael.lima@equiptrack.local` | Solicitante |
+| `beatriz.alves@equiptrack.local` | Solicitante |
+
+## Front-end
+
+O front (repositório `EquipTrak/frontend`) chama esta API pelo prefixo `/api`. Com o backend na porta 8080, rode `npm start` no front e acesse `http://localhost:4200`.
 
 ## Documentação
 
 - [Autenticação](docs/autenticacao.md)
+- [Integração com o front-end](docs/integracao-frontend.md)
 - Swagger UI: `http://localhost:8080/swagger-ui.html`, com a aplicação rodando
