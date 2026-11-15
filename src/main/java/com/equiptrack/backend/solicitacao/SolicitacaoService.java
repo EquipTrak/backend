@@ -1,5 +1,7 @@
 package com.equiptrack.backend.solicitacao;
 
+import com.equiptrack.backend.emprestimo.Emprestimo;
+import com.equiptrack.backend.emprestimo.EmprestimoRepository;
 import com.equiptrack.backend.equipamento.Equipamento;
 import com.equiptrack.backend.equipamento.EquipamentoRepository;
 import com.equiptrack.backend.equipamento.Situacao;
@@ -20,6 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class SolicitacaoService {
@@ -34,10 +39,12 @@ public class SolicitacaoService {
 	private final SolicitanteRepository solicitanteRepository;
 	private final EquipamentoRepository equipamentoRepository;
 	private final UsuarioRepository usuarioRepository;
+	private final EmprestimoRepository emprestimoRepository;
 
 	public SolicitacaoService(SolicitacaoRepository solicitacaoRepository,
 			SolicitanteRepository solicitanteRepository, EquipamentoRepository equipamentoRepository,
-			UsuarioRepository usuarioRepository) {
+			UsuarioRepository usuarioRepository, EmprestimoRepository emprestimoRepository) {
+		this.emprestimoRepository = emprestimoRepository;
 		this.solicitacaoRepository = solicitacaoRepository;
 		this.solicitanteRepository = solicitanteRepository;
 		this.equipamentoRepository = equipamentoRepository;
@@ -95,7 +102,7 @@ public class SolicitacaoService {
 	/** Solicitações do usuário logado, da mais recente para a mais antiga (RF18). */
 	@Transactional(readOnly = true)
 	public List<SolicitacaoResponse> listarMinhas(Long usuarioId) {
-		return solicitacaoRepository.buscarDoUsuario(usuarioId).stream().map(SolicitacaoResponse::de).toList();
+		return comEmprestimos(solicitacaoRepository.buscarDoUsuario(usuarioId));
 	}
 
 	/**
@@ -118,7 +125,7 @@ public class SolicitacaoService {
 	/** Fila do operador (RF09), com filtro opcional de status, da mais antiga para a mais recente. */
 	@Transactional(readOnly = true)
 	public List<SolicitacaoResponse> listarFila(StatusSolicitacao status) {
-		return solicitacaoRepository.buscarFila(status).stream().map(SolicitacaoResponse::de).toList();
+		return comEmprestimos(solicitacaoRepository.buscarFila(status));
 	}
 
 	/**
@@ -160,6 +167,18 @@ public class SolicitacaoService {
 		solicitacao.setMotivoRejeicao(motivo.trim());
 		registrarDecisao(solicitacao, operadorId);
 		return SolicitacaoResponse.de(solicitacao);
+	}
+
+	/** Junta a cada solicitação o seu empréstimo, se a retirada já foi registrada, com uma só consulta. */
+	private List<SolicitacaoResponse> comEmprestimos(List<SolicitacaoEmprestimo> solicitacoes) {
+		if (solicitacoes.isEmpty()) {
+			return List.of();
+		}
+		Map<Long, Emprestimo> porSolicitacao = emprestimoRepository
+			.buscarPorSolicitacoes(solicitacoes.stream().map(SolicitacaoEmprestimo::getId).toList())
+			.stream()
+			.collect(Collectors.toMap(e -> e.getSolicitacao().getId(), Function.identity()));
+		return solicitacoes.stream().map(s -> SolicitacaoResponse.de(s, porSolicitacao.get(s.getId()))).toList();
 	}
 
 	private SolicitacaoEmprestimo buscarPendente(Long id) {

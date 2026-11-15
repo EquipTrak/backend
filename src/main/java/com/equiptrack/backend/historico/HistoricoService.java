@@ -1,6 +1,8 @@
 package com.equiptrack.backend.historico;
 
+import com.equiptrack.backend.emprestimo.Emprestimo;
 import com.equiptrack.backend.equipamento.Equipamento;
+import com.equiptrack.backend.equipamento.Situacao;
 import com.equiptrack.backend.equipamento.EquipamentoRepository;
 import com.equiptrack.backend.exception.RecursoNaoEncontradoException;
 import com.equiptrack.backend.historico.dto.EventoHistoricoResponse;
@@ -37,6 +39,21 @@ public class HistoricoService {
 		evento.setSituacaoNova(equipamento.getSituacao());
 		evento.setCondicaoNova(equipamento.getCondicao());
 		evento.setObservacao("Situação inicial definida.");
+		historicoRepository.save(evento);
+	}
+
+	/** Registra a retirada (RN11), na mesma transação que cria o empréstimo. */
+	@Transactional
+	public void registrarRetirada(Equipamento equipamento, Emprestimo emprestimo, Situacao situacaoAnterior,
+			Long usuarioId, String observacao) {
+		HistoricoEquipamento evento = new HistoricoEquipamento();
+		evento.setEquipamento(equipamento);
+		evento.setEmprestimo(emprestimo);
+		evento.setUsuario(usuarioRepository.getReferenceById(usuarioId));
+		evento.setTipo(TipoEvento.RETIRADA);
+		evento.setSituacaoAnterior(situacaoAnterior);
+		evento.setSituacaoNova(equipamento.getSituacao());
+		evento.setObservacao(observacao);
 		historicoRepository.save(evento);
 	}
 

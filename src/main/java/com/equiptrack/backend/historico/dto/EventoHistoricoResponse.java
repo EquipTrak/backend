@@ -18,7 +18,8 @@ public record EventoHistoricoResponse(Long id, Instant dataHora, TipoEvento tipo
 		return new EventoHistoricoResponse(evento.getId(), evento.getDataHora(), evento.getTipo(),
 				new UsuarioResumo(evento.getUsuario().getId(), evento.getUsuario().getNome()),
 				evento.getSituacaoAnterior(), evento.getSituacaoNova(), evento.getCondicaoAnterior(),
-				evento.getCondicaoNova(), evento.getObservacao(), evento.getEmprestimoId());
+				evento.getCondicaoNova(), evento.getObservacao(),
+				evento.getEmprestimo() == null ? null : evento.getEmprestimo().getId());
 	}
 
 }

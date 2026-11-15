@@ -16,7 +16,7 @@ Este documento acompanha a ligação entre o front (`EquipTrak/frontend`) e esta
 | 1 | Login, sessão, logout e perfil do usuário | Feita |
 | 2 | Equipamentos, por tela do front: 2a lista e cadastro, 2b histórico | Feita |
 | 3 | Solicitações, por tela do front: 3a criar, 3b minhas solicitações e cancelar, 3c fila do operador, aprovar e rejeitar | Feita |
-| 4 | Empréstimos: retirada, devolução, atraso e histórico do equipamento | Pendente |
+| 4 | Empréstimos, por tela do front: 4a retirada (feita); devolução e atraso | Em andamento |
 | 5 | Indicadores do painel, histórico por solicitante e bloqueio por atraso | Pendente |
 
 ### Parte 1: autenticação
@@ -106,8 +106,8 @@ A edição de equipamento (RF05) ainda não tem tela no front e ficou fora.
 
 - `tipo` usa os valores do DER: `CADASTRO`, `RETIRADA`, `DEVOLUCAO`, `MUDANCA_CONDICAO`, `MUDANCA_SITUACAO`, `MANUTENCAO` e `CORRECAO`.
 - O patrimônio é procurado sem diferenciar maiúsculas. Patrimônio inexistente responde 404; perfil `SOLICITANTE` responde 403; equipamento sem eventos devolve `[]`.
-- Os eventos são gravados pelo próprio backend, na mesma transação da ação (RN11), e nunca são alterados nem apagados (RN12). Por enquanto só o cadastro (`POST /api/equipamentos`) gera evento; retirada, devolução e os demais entram com as partes 3 e 4.
-- `emprestimoId` fica nulo até existir a tabela de empréstimos (parte 4), quando a coluna vira chave estrangeira.
+- Os eventos são gravados pelo próprio backend, na mesma transação da ação (RN11), e nunca são alterados nem apagados (RN12). Hoje geram evento o cadastro (`POST /api/equipamentos`) e a retirada (parte 4a); a devolução entra na parte 4b.
+- `emprestimoId` vem preenchido nos eventos ligados a um empréstimo, como a retirada. Desde a parte 4a, a coluna é chave estrangeira para `emprestimo`.
 - No perfil `dev`, os equipamentos de demonstração ganham o evento de cadastro em nome de Marina Souza, se `EQUIPTRACK_DEV_SENHA` estiver definida.
 
 No front:
@@ -233,6 +233,54 @@ No front:
 - As abas "Em uso" e "Atrasados" ficam vazias até a parte 4, pois a API ainda não devolve os status de empréstimo. Retirada e devolução continuam locais.
 - Saiu o evento local "Solicitação aprovada" da gaveta de histórico.
 
+### Parte 4a: botão "Registrar retirada" da fila do operador
+
+| Tela ou ação do front | Endpoint | Quem pode |
+|---|---|---|
+| Modal "Registrar retirada", botão "Confirmar retirada" | `POST /api/solicitacoes/{id}/retirada` | `OPERADOR`, `ENCARREGADO` e `ADMINISTRADOR` |
+
+- Não tem corpo. A resposta é 201, com o cabeçalho `Location` e a solicitação no formato das listas, agora com o empréstimo:
+
+  ```json
+  {
+    "id": 42,
+    "status": "APROVADA",
+    "emprestimo": {
+      "id": 9,
+      "status": "ATIVO",
+      "dataRetirada": "2026-11-20T12:05:00Z",
+      "dataPrevistaDevolucao": "2026-11-20T15:00:00Z",
+      "dataDevolucao": null
+    }
+  }
+  ```
+
+  (os demais campos seguem iguais aos da parte 3a.)
+
+- Na mesma transação, o backend cria o empréstimo, passa o equipamento a `EMPRESTADO` e grava o evento `RETIRADA` no histórico, com `emprestimoId` (RN11).
+- A devolução prevista é o fim previsto da solicitação.
+
+  | Regra | Resposta |
+  |---|---|
+  | Solicitação inexistente | 404 |
+  | Solicitação que não está `APROVADA` | 409 |
+  | Retirada já registrada para a solicitação | 409 |
+  | Fim previsto já passou | 409 em `campos.periodo` |
+  | Solicitante com status `BLOQUEADO` | 409 em `campos.solicitante` |
+  | Equipamento que não está `DISPONIVEL` (RN02) ou com empréstimo em aberto (RN04) | 409 em `campos.equipamentoId` |
+  | Perfil `SOLICITANTE` | 403 |
+
+- Entrou a tabela `emprestimo` do DER. `ativo_flag` vale 1 enquanto o empréstimo está em aberto e fica nulo depois da devolução, e a restrição única `uk_emprestimo_equipamento_ativo` (equipamento, `ativo_flag`) impede, no próprio banco, dois empréstimos em aberto do mesmo equipamento (RN04, RNF06). A retirada também trava a linha do equipamento.
+- As listas de solicitações (`/minhas` e a fila) passaram a trazer `emprestimo`, nulo antes da retirada.
+- O bloqueio por atraso (RF14) entra na parte 4c.
+
+No front:
+
+- "Confirmar retirada" chama a API e fica desabilitado enquanto ela responde. Os erros aparecem no modal; em 409 e 404, a fila e o catálogo são recarregados.
+- O front combina os dois status (divergência 3): empréstimo `ATIVO` aparece como `RETIRADO`, `ATRASADO` como `ATRASADO` e `DEVOLVIDO` como `DEVOLVIDO`. A aba "Em uso" da fila e "Minhas solicitações" mostram as retiradas.
+- Saiu o evento local "Retirada registrada" da gaveta: o evento vem do backend.
+- O `NB-0002` do perfil `dev` continua nascendo `EMPRESTADO` sem empréstimo, só para a demonstração.
+
 ## Contrato das próximas partes
 
 Endpoints propostos a partir do que as telas do front já fazem com dados de demonstração. Eles servem de ponto de partida e podem mudar na revisão de cada parte.
@@ -248,7 +296,7 @@ Endpoints propostos a partir do que as telas do front já fazem com dados de dem
 | 3b | `cancelarSolicitacao` | `POST /api/solicitacoes/{id}/cancelamento` (feito) | RF23 |
 | 3c | `aprovarSolicitacao` | `POST /api/solicitacoes/{id}/aprovacao` (feito) | RF09, RN13 |
 | 3c | `rejeitarSolicitacao` | `POST /api/solicitacoes/{id}/rejeicao` com `{ motivo }` (feito) | RF09 |
-| 4 | `registrarRetirada` | `POST /api/solicitacoes/{id}/retirada` | RF10 |
+| 4a | `registrarRetirada` | `POST /api/solicitacoes/{id}/retirada` (feito) | RF10, RN02, RN04 |
 | 4 | `registrarDevolucao` | `POST /api/emprestimos/{id}/devolucao` com `{ condicao, observacao }` | RF11, RF12 |
 | 2b | Gaveta de histórico | `GET /api/equipamentos/{patrimonio}/historico` (feito) | RF15 |
 | 5 | Faixa de indicadores | `GET /api/painel/indicadores` | RF20 |
@@ -261,7 +309,7 @@ O front foi feito antes do DER final. Estas diferenças precisam de decisão ant
 |---|---|---|---|---|
 | 1 | Situação do equipamento | `DISPONIVEL`, `EMPRESTADO`, `INDISPONIVEL` | `DISPONIVEL`, `EMPRESTADO`, `DANIFICADO`, `EM_MANUTENCAO` | Resolvida na parte 2a: a API segue o DER e o front ganhou os dois selos novos. O indicador "Indisponíveis" soma `DANIFICADO` e `EM_MANUTENCAO`. |
 | 2 | Condição | `OTIMA`, `BOA`, `COM_AVARIA` | Inclui também `REGULAR` | Resolvida na parte 2a: `REGULAR` foi adicionada no front. |
-| 3 | Status da solicitação | Um único status com `RETIRADO`, `DEVOLVIDO` e `ATRASADO` | Solicitação (`PENDENTE`, `APROVADA`, `REJEITADA`, `CANCELADA`) separada do empréstimo (`ATIVO`, `ATRASADO`, `DEVOLVIDO`) | A API mantém as duas tabelas, mas a listagem devolve um status combinado no formato do front. `ATIVO` vira `RETIRADO`, e o front ganha `CANCELADA`. |
+| 3 | Status da solicitação | Um único status com `RETIRADO`, `DEVOLVIDO` e `ATRASADO` | Solicitação (`PENDENTE`, `APROVADA`, `REJEITADA`, `CANCELADA`) separada do empréstimo (`ATIVO`, `ATRASADO`, `DEVOLVIDO`) | Resolvida nas partes 3a e 4a: a API devolve os dois status (`status` e `emprestimo.status`), e o front combina para exibir. `ATIVO` vira `RETIRADO`, e o front ganhou `CANCELADA`. |
 | 4 | Identificadores | Texto, como `S-101` | Número (`BIGINT`) | A API devolve o número, e o front exibe com o prefixo. |
 | 5 | Categorias | Lista fixa no código | Tabela `categoria_equipamento` | Resolvida na parte 2a: o front busca `GET /api/categorias`. |
 | 6 | Datas | Texto em `dd/MM/yyyy HH:mm` | `DATETIME` | A API usa ISO-8601, e o front formata para exibir. |

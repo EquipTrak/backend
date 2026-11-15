@@ -1,5 +1,6 @@
 package com.equiptrack.backend.historico;
 
+import com.equiptrack.backend.emprestimo.Emprestimo;
 import com.equiptrack.backend.equipamento.Condicao;
 import com.equiptrack.backend.equipamento.Equipamento;
 import com.equiptrack.backend.equipamento.Situacao;
@@ -41,9 +42,9 @@ public class HistoricoEquipamento {
 	@JoinColumn(name = "id_equipamento", nullable = false, updatable = false)
 	private Equipamento equipamento;
 
-	// Vira chave estrangeira quando a tabela de empréstimos existir (parte 4).
-	@Column(name = "id_emprestimo", updatable = false)
-	private Long emprestimoId;
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "id_emprestimo", updatable = false)
+	private Emprestimo emprestimo;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "id_usuario", nullable = false, updatable = false)
