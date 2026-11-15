@@ -1,7 +1,11 @@
 package com.equiptrack.backend.equipamento;
 
+import com.equiptrack.backend.historico.HistoricoService;
+import com.equiptrack.backend.usuario.Usuario;
+import com.equiptrack.backend.usuario.UsuarioRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,6 +17,7 @@ import java.util.List;
  */
 @Component
 @Profile("dev")
+@Order(2) // Depois do UsuariosDevInitializer, que cria quem assina o histórico.
 public class CatalogoDevInitializer implements CommandLineRunner {
 
 	static final List<String> CATEGORIAS = List.of("Adaptador", "Câmera", "Kit", "Notebook", "Projetor");
@@ -29,18 +34,28 @@ public class CatalogoDevInitializer implements CommandLineRunner {
 			new EquipamentoDemo("KT-0001", "Kit tripé e iluminação", "Kit", Condicao.OTIMA, Situacao.DISPONIVEL, 48),
 			new EquipamentoDemo("AD-0001", "Adaptador HDMI", "Adaptador", Condicao.BOA, Situacao.DISPONIVEL, 24));
 
+	/** Operadora de demonstração que assina o evento de cadastro no histórico. */
+	static final String EMAIL_OPERADOR = "marina.souza@equiptrack.local";
+
 	private final CategoriaRepository categoriaRepository;
 	private final EquipamentoRepository equipamentoRepository;
+	private final UsuarioRepository usuarioRepository;
+	private final HistoricoService historicoService;
 
 	public CatalogoDevInitializer(CategoriaRepository categoriaRepository,
-			EquipamentoRepository equipamentoRepository) {
+			EquipamentoRepository equipamentoRepository, UsuarioRepository usuarioRepository,
+			HistoricoService historicoService) {
 		this.categoriaRepository = categoriaRepository;
 		this.equipamentoRepository = equipamentoRepository;
+		this.usuarioRepository = usuarioRepository;
+		this.historicoService = historicoService;
 	}
 
 	@Override
 	@Transactional
 	public void run(String... args) {
+		// Sem EQUIPTRACK_DEV_SENHA não há usuários de demonstração; o catálogo é criado sem histórico.
+		Long operadorId = usuarioRepository.findByEmailIgnoreCase(EMAIL_OPERADOR).map(Usuario::getId).orElse(null);
 		for (String nome : CATEGORIAS) {
 			if (categoriaRepository.findByNomeIgnoreCase(nome).isEmpty()) {
 				categoriaRepository.save(new Categoria(nome));
@@ -55,7 +70,10 @@ public class CatalogoDevInitializer implements CommandLineRunner {
 				equipamento.setCondicao(demo.condicao());
 				equipamento.setSituacao(demo.situacao());
 				equipamento.setPrazoMaxHoras(demo.prazoMaxHoras());
-				equipamentoRepository.save(equipamento);
+				equipamento = equipamentoRepository.save(equipamento);
+				if (operadorId != null) {
+					historicoService.registrarCadastro(equipamento, operadorId);
+				}
 			}
 		}
 	}

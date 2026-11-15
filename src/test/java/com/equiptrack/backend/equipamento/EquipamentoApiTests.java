@@ -4,7 +4,9 @@ import com.equiptrack.backend.auth.SessaoRepository;
 import com.equiptrack.backend.usuario.Perfil;
 import com.equiptrack.backend.usuario.Usuario;
 import com.equiptrack.backend.usuario.UsuarioRepository;
+import com.equiptrack.backend.historico.HistoricoEquipamentoRepository;
 import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +49,9 @@ class EquipamentoApiTests {
 	private EquipamentoRepository equipamentoRepository;
 
 	@Autowired
+	private HistoricoEquipamentoRepository historicoRepository;
+
+	@Autowired
 	private PasswordEncoder passwordEncoder;
 
 	private Categoria notebook;
@@ -56,10 +61,7 @@ class EquipamentoApiTests {
 
 	@BeforeEach
 	void preparar() throws Exception {
-		equipamentoRepository.deleteAll();
-		categoriaRepository.deleteAll();
-		sessaoRepository.deleteAll();
-		usuarioRepository.deleteAll();
+		limpar();
 
 		notebook = categoriaRepository.save(new Categoria("Notebook"));
 		projetor = categoriaRepository.save(new Categoria("Projetor"));
@@ -73,6 +75,16 @@ class EquipamentoApiTests {
 
 		tokenOperador = entrar("operador@equiptrack.local", Perfil.OPERADOR);
 		tokenSolicitante = entrar("solicitante@equiptrack.local", Perfil.SOLICITANTE);
+	}
+
+	// O cadastro grava histórico, que aponta para usuário e equipamento e precisa sair antes deles.
+	@AfterEach
+	void limpar() {
+		historicoRepository.deleteAll();
+		equipamentoRepository.deleteAll();
+		categoriaRepository.deleteAll();
+		sessaoRepository.deleteAll();
+		usuarioRepository.deleteAll();
 	}
 
 	@Test

@@ -3,6 +3,7 @@ package com.equiptrack.backend.usuario;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -14,6 +15,7 @@ import java.util.List;
  */
 @Component
 @Profile("dev")
+@Order(1) // Antes do CatalogoDevInitializer, que precisa da operadora de demonstração.
 public class UsuariosDevInitializer implements CommandLineRunner {
 
 	private record UsuarioDemo(String nome, String email, Perfil perfil) {
