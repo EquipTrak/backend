@@ -42,6 +42,8 @@ public class SecurityConfig {
 					.hasAnyRole("OPERADOR", "ENCARREGADO", "ADMINISTRADOR")
 				.requestMatchers(HttpMethod.POST, "/api/equipamentos")
 					.hasAnyRole("OPERADOR", "ENCARREGADO", "ADMINISTRADOR")
+				// Criar solicitação (RF08): só quem tem perfil de solicitante.
+				.requestMatchers(HttpMethod.POST, "/api/solicitacoes").hasRole("SOLICITANTE")
 				.anyRequest().authenticated())
 			.exceptionHandling(exceptions -> exceptions
 				.authenticationEntryPoint(erroSegurancaHandler)
