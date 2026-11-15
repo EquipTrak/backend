@@ -15,7 +15,7 @@ Este documento acompanha a ligação entre o front (`EquipTrak/frontend`) e esta
 |---|---|---|
 | 1 | Login, sessão, logout e perfil do usuário | Feita |
 | 2 | Equipamentos, por tela do front: 2a lista e cadastro, 2b histórico | Feita |
-| 3 | Solicitações, por tela do front: 3a criar (feita), 3b minhas solicitações e cancelar (feita); fila do operador, aprovar e rejeitar | Em andamento |
+| 3 | Solicitações, por tela do front: 3a criar, 3b minhas solicitações e cancelar, 3c fila do operador, aprovar e rejeitar | Feita |
 | 4 | Empréstimos: retirada, devolução, atraso e histórico do equipamento | Pendente |
 | 5 | Indicadores do painel, histórico por solicitante e bloqueio por atraso | Pendente |
 
@@ -197,7 +197,41 @@ No front:
 
 - A lista é buscada ao abrir o painel, com estados de carregando e de erro ("Tentar novamente"). Saíram os dados de demonstração do solicitante e o filtro pelo nome (divergência 7, para esta tela).
 - Cada solicitação pendente tem o botão "Cancelar solicitação", com confirmação. Se a API responder 409 ou 404, o modal mostra o motivo e a lista é recarregada.
-- A fila do operador ainda parte de dados de demonstração e é a próxima tela.
+
+### Parte 3c: fila de solicitações do operador
+
+| Tela ou ação do front | Endpoint | Quem pode |
+|---|---|---|
+| Abas "Pendentes" e "Aprovadas" da fila | `GET /api/solicitacoes?status=` | `OPERADOR`, `ENCARREGADO` e `ADMINISTRADOR` |
+| Botão "Aprovar" | `POST /api/solicitacoes/{id}/aprovacao` | os mesmos |
+| Modal "Rejeitar solicitação" | `POST /api/solicitacoes/{id}/rejeicao` com `{ "motivo": "..." }` | os mesmos |
+
+- `GET /api/solicitacoes` devolve as solicitações de todos os solicitantes, da mais antiga para a mais recente (ordem de chegada), no mesmo formato das outras rotas. `status` é opcional; um valor fora do DER responde 400.
+- A aprovação não tem corpo. As duas decisões devolvem a solicitação atualizada e gravam quem decidiu (`id_operador_decisao`) e quando (`data_decisao`), conforme a RN11.
+
+  | Regra | Resposta |
+  |---|---|
+  | Solicitação inexistente | 404 |
+  | Solicitação que não está `PENDENTE` | 409 |
+  | Aprovação: outra solicitação `APROVADA` do mesmo equipamento com período que se sobrepõe (RN13) | 409 em `campos.periodo` |
+  | Aprovação: equipamento `DANIFICADO`, `EM_MANUTENCAO` ou inativo | 409 em `campos.equipamentoId` |
+  | Aprovação: solicitante com status `BLOQUEADO` | 409 em `campos.solicitante` |
+  | Rejeição: `motivo` vazio ou com mais de 255 caracteres | 400 em `campos.motivo` |
+  | Perfil `SOLICITANTE` | 403 |
+
+- Períodos que só se encostam (um termina quando o outro começa) não contam como sobreposição.
+- A aprovação trava a linha do equipamento até o fim da transação, para que duas aprovações simultâneas do mesmo equipamento não passem as duas pela RN13 (RNF06).
+- Aprovar não é retirar (RN03): a situação do equipamento não muda, e nada é gravado no histórico. Um equipamento `EMPRESTADO` pode ter a próxima solicitação aprovada; a retirada é que espera a devolução.
+- O bloqueio por atraso (RF14) entra com a tabela de empréstimos (parte 4).
+
+No front:
+
+- A fila é buscada ao abrir o painel, com estados de carregando e de erro. Saíram os dados de demonstração das solicitações.
+- "Aprovar" fica desabilitado enquanto a chamada está em andamento. Um erro aparece em aviso, com o motivo devolvido pela API.
+- O modal de rejeição mostra o erro do motivo no campo e os demais embaixo.
+- Em 409 e 404, a fila é recarregada para mostrar o status atual.
+- As abas "Em uso" e "Atrasados" ficam vazias até a parte 4, pois a API ainda não devolve os status de empréstimo. Retirada e devolução continuam locais.
+- Saiu o evento local "Solicitação aprovada" da gaveta de histórico.
 
 ## Contrato das próximas partes
 
@@ -209,11 +243,11 @@ Endpoints propostos a partir do que as telas do front já fazem com dados de dem
 | 2a | `cadastrarEquipamento` | `POST /api/equipamentos` (feito) | RF04 |
 | 2a | Lista de categorias no formulário | `GET /api/categorias` (feito) | RF06 |
 | 3a | `criarSolicitacao` | `POST /api/solicitacoes` (feito) | RF08 |
-| 3 | Fila do operador | `GET /api/solicitacoes?status=` | RF09 |
+| 3c | Fila do operador | `GET /api/solicitacoes?status=` (feito) | RF09 |
 | 3b | Minhas solicitações | `GET /api/solicitacoes/minhas` (feito) | RF18 |
 | 3b | `cancelarSolicitacao` | `POST /api/solicitacoes/{id}/cancelamento` (feito) | RF23 |
-| 3 | `aprovarSolicitacao` | `POST /api/solicitacoes/{id}/aprovacao` | RF09 |
-| 3 | `rejeitarSolicitacao` | `POST /api/solicitacoes/{id}/rejeicao` com `{ motivo }` | RF09 |
+| 3c | `aprovarSolicitacao` | `POST /api/solicitacoes/{id}/aprovacao` (feito) | RF09, RN13 |
+| 3c | `rejeitarSolicitacao` | `POST /api/solicitacoes/{id}/rejeicao` com `{ motivo }` (feito) | RF09 |
 | 4 | `registrarRetirada` | `POST /api/solicitacoes/{id}/retirada` | RF10 |
 | 4 | `registrarDevolucao` | `POST /api/emprestimos/{id}/devolucao` com `{ condicao, observacao }` | RF11, RF12 |
 | 2b | Gaveta de histórico | `GET /api/equipamentos/{patrimonio}/historico` (feito) | RF15 |

@@ -47,6 +47,11 @@ public class SecurityConfig {
 				// Minhas solicitações (RF18) e cancelamento (RF23): também só do solicitante.
 				.requestMatchers(HttpMethod.GET, "/api/solicitacoes/minhas").hasRole("SOLICITANTE")
 				.requestMatchers(HttpMethod.POST, "/api/solicitacoes/*/cancelamento").hasRole("SOLICITANTE")
+				// Fila, aprovação e rejeição (RF09): perfis com a visão do operador.
+				.requestMatchers(HttpMethod.GET, "/api/solicitacoes")
+					.hasAnyRole("OPERADOR", "ENCARREGADO", "ADMINISTRADOR")
+				.requestMatchers(HttpMethod.POST, "/api/solicitacoes/*/aprovacao", "/api/solicitacoes/*/rejeicao")
+					.hasAnyRole("OPERADOR", "ENCARREGADO", "ADMINISTRADOR")
 				.anyRequest().authenticated())
 			.exceptionHandling(exceptions -> exceptions
 				.authenticationEntryPoint(erroSegurancaHandler)

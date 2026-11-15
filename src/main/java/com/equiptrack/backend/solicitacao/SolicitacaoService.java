@@ -13,6 +13,7 @@ import com.equiptrack.backend.solicitante.SituacaoMatricula;
 import com.equiptrack.backend.solicitante.Solicitante;
 import com.equiptrack.backend.solicitante.SolicitanteRepository;
 import com.equiptrack.backend.solicitante.StatusSolicitante;
+import com.equiptrack.backend.usuario.UsuarioRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,12 +33,15 @@ public class SolicitacaoService {
 	private final SolicitacaoRepository solicitacaoRepository;
 	private final SolicitanteRepository solicitanteRepository;
 	private final EquipamentoRepository equipamentoRepository;
+	private final UsuarioRepository usuarioRepository;
 
 	public SolicitacaoService(SolicitacaoRepository solicitacaoRepository,
-			SolicitanteRepository solicitanteRepository, EquipamentoRepository equipamentoRepository) {
+			SolicitanteRepository solicitanteRepository, EquipamentoRepository equipamentoRepository,
+			UsuarioRepository usuarioRepository) {
 		this.solicitacaoRepository = solicitacaoRepository;
 		this.solicitanteRepository = solicitanteRepository;
 		this.equipamentoRepository = equipamentoRepository;
+		this.usuarioRepository = usuarioRepository;
 	}
 
 	/** Cria a solicitação do usuário logado, sempre como PENDENTE (RF08). */
@@ -109,6 +113,68 @@ public class SolicitacaoService {
 		// RN11: o momento do cancelamento fica em data_decisao; id_operador_decisao segue nulo.
 		solicitacao.setDataDecisao(Instant.now());
 		return SolicitacaoResponse.de(solicitacao);
+	}
+
+	/** Fila do operador (RF09), com filtro opcional de status, da mais antiga para a mais recente. */
+	@Transactional(readOnly = true)
+	public List<SolicitacaoResponse> listarFila(StatusSolicitacao status) {
+		return solicitacaoRepository.buscarFila(status).stream().map(SolicitacaoResponse::de).toList();
+	}
+
+	/**
+	 * Aprova a solicitação pendente (RF09). Aprovar não é retirar (RN03): o equipamento continua com a
+	 * situação que tem até a retirada.
+	 */
+	@Transactional
+	public SolicitacaoResponse aprovar(Long id, Long operadorId) {
+		SolicitacaoEmprestimo solicitacao = buscarPendente(id);
+		if (solicitacao.getSolicitante().getStatus() == StatusSolicitante.BLOQUEADO) {
+			throw new ConflitoException("solicitante", "O solicitante está bloqueado e não pode ter solicitações aprovadas.");
+		}
+
+		// A trava faz duas aprovações simultâneas do mesmo equipamento rodarem em fila, então a
+		// verificação de sobreposição abaixo enxerga a primeira (RN13 sob concorrência).
+		Equipamento equipamento = equipamentoRepository.travarPorId(solicitacao.getEquipamento().getId())
+			.orElseThrow(() -> new RecursoNaoEncontradoException("Equipamento não encontrado."));
+		if (!equipamento.isAtivo() || equipamento.getSituacao() == Situacao.DANIFICADO
+				|| equipamento.getSituacao() == Situacao.EM_MANUTENCAO) {
+			throw new ConflitoException("equipamentoId",
+					"Este equipamento está indisponível (danificado, em manutenção ou inativo).");
+		}
+		if (solicitacaoRepository.existeSobreposta(equipamento.getId(), StatusSolicitacao.APROVADA,
+				solicitacao.getId(), solicitacao.getDataInicioPrevista(), solicitacao.getDataFimPrevista())) {
+			throw new ConflitoException("periodo",
+					"Já existe uma solicitação aprovada para este equipamento em um período que se sobrepõe a este.");
+		}
+
+		solicitacao.setStatus(StatusSolicitacao.APROVADA);
+		registrarDecisao(solicitacao, operadorId);
+		return SolicitacaoResponse.de(solicitacao);
+	}
+
+	/** Rejeita a solicitação pendente, com o motivo informado pelo operador (RF09). */
+	@Transactional
+	public SolicitacaoResponse rejeitar(Long id, String motivo, Long operadorId) {
+		SolicitacaoEmprestimo solicitacao = buscarPendente(id);
+		solicitacao.setStatus(StatusSolicitacao.REJEITADA);
+		solicitacao.setMotivoRejeicao(motivo.trim());
+		registrarDecisao(solicitacao, operadorId);
+		return SolicitacaoResponse.de(solicitacao);
+	}
+
+	private SolicitacaoEmprestimo buscarPendente(Long id) {
+		SolicitacaoEmprestimo solicitacao = solicitacaoRepository.buscarPorId(id)
+			.orElseThrow(() -> new RecursoNaoEncontradoException("Solicitação não encontrada."));
+		if (solicitacao.getStatus() != StatusSolicitacao.PENDENTE) {
+			throw new ConflitoException("status", "Esta solicitação não está mais pendente.");
+		}
+		return solicitacao;
+	}
+
+	/** RN11: quem decidiu e quando. */
+	private void registrarDecisao(SolicitacaoEmprestimo solicitacao, Long operadorId) {
+		solicitacao.setOperadorDecisao(usuarioRepository.getReferenceById(operadorId));
+		solicitacao.setDataDecisao(Instant.now());
 	}
 
 }
