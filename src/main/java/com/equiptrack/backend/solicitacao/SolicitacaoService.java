@@ -1,5 +1,6 @@
 package com.equiptrack.backend.solicitacao;
 
+import com.equiptrack.backend.emprestimo.Atrasos;
 import com.equiptrack.backend.emprestimo.Emprestimo;
 import com.equiptrack.backend.emprestimo.EmprestimoRepository;
 import com.equiptrack.backend.equipamento.Equipamento;
@@ -40,11 +41,13 @@ public class SolicitacaoService {
 	private final EquipamentoRepository equipamentoRepository;
 	private final UsuarioRepository usuarioRepository;
 	private final EmprestimoRepository emprestimoRepository;
+	private final Atrasos atrasos;
 
 	public SolicitacaoService(SolicitacaoRepository solicitacaoRepository,
 			SolicitanteRepository solicitanteRepository, EquipamentoRepository equipamentoRepository,
-			UsuarioRepository usuarioRepository, EmprestimoRepository emprestimoRepository) {
+			UsuarioRepository usuarioRepository, EmprestimoRepository emprestimoRepository, Atrasos atrasos) {
 		this.emprestimoRepository = emprestimoRepository;
+		this.atrasos = atrasos;
 		this.solicitacaoRepository = solicitacaoRepository;
 		this.solicitanteRepository = solicitanteRepository;
 		this.equipamentoRepository = equipamentoRepository;
@@ -62,6 +65,11 @@ public class SolicitacaoService {
 		}
 		if (solicitante.getSituacaoMatricula() == SituacaoMatricula.INATIVA) {
 			throw new OperacaoNaoPermitidaException("Sua matrícula está inativa.");
+		}
+		// RF14 e RN09: com atraso, novas solicitações ficam bloqueadas até a devolução.
+		if (atrasos.solicitanteTemAtraso(solicitante.getId())) {
+			throw new OperacaoNaoPermitidaException(
+					"Você tem um empréstimo em atraso. Devolva o equipamento para fazer novas solicitações.");
 		}
 
 		// RN10: período válido.
@@ -138,6 +146,11 @@ public class SolicitacaoService {
 		if (solicitacao.getSolicitante().getStatus() == StatusSolicitante.BLOQUEADO) {
 			throw new ConflitoException("solicitante", "O solicitante está bloqueado e não pode ter solicitações aprovadas.");
 		}
+		// RF14: solicitante com atraso não tem aprovação até regularizar (RN09).
+		if (atrasos.solicitanteTemAtraso(solicitacao.getSolicitante().getId())) {
+			throw new ConflitoException("solicitante",
+					"O solicitante tem um empréstimo em atraso e só pode ter aprovações depois de devolvê-lo.");
+		}
 
 		// A trava faz duas aprovações simultâneas do mesmo equipamento rodarem em fila, então a
 		// verificação de sobreposição abaixo enxerga a primeira (RN13 sob concorrência).
@@ -178,7 +191,10 @@ public class SolicitacaoService {
 			.buscarPorSolicitacoes(solicitacoes.stream().map(SolicitacaoEmprestimo::getId).toList())
 			.stream()
 			.collect(Collectors.toMap(e -> e.getSolicitacao().getId(), Function.identity()));
-		return solicitacoes.stream().map(s -> SolicitacaoResponse.de(s, porSolicitacao.get(s.getId()))).toList();
+		return solicitacoes.stream().map(s -> {
+			Emprestimo emprestimo = porSolicitacao.get(s.getId());
+			return SolicitacaoResponse.de(s, emprestimo, emprestimo == null ? null : atrasos.statusAtual(emprestimo));
+		}).toList();
 	}
 
 	private SolicitacaoEmprestimo buscarPendente(Long id) {

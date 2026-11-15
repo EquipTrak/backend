@@ -41,7 +41,7 @@ Todos usam a mesma senha:
 | `rafael.lima@equiptrack.local` | Solicitante |
 | `beatriz.alves@equiptrack.local` | Solicitante |
 
-Os dois solicitantes também ganham o cadastro de solicitante (matrículas `DEMO-0001` e `DEMO-0002`), necessário para criar solicitações.
+Os dois solicitantes também ganham o cadastro de solicitante (matrículas `DEMO-0001` e `DEMO-0002`), necessário para criar solicitações. Beatriz Alves começa com o `NB-0002` em atraso, para testar a aba "Atrasados" e o bloqueio por atraso.
 
 ## Front-end
 

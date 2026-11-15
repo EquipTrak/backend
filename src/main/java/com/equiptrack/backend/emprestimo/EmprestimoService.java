@@ -28,10 +28,12 @@ public class EmprestimoService {
 	private final EquipamentoRepository equipamentoRepository;
 	private final UsuarioRepository usuarioRepository;
 	private final HistoricoService historicoService;
+	private final Atrasos atrasos;
 
 	public EmprestimoService(EmprestimoRepository emprestimoRepository, SolicitacaoRepository solicitacaoRepository,
 			EquipamentoRepository equipamentoRepository, UsuarioRepository usuarioRepository,
-			HistoricoService historicoService) {
+			HistoricoService historicoService, Atrasos atrasos) {
+		this.atrasos = atrasos;
 		this.emprestimoRepository = emprestimoRepository;
 		this.solicitacaoRepository = solicitacaoRepository;
 		this.equipamentoRepository = equipamentoRepository;
@@ -55,6 +57,11 @@ public class EmprestimoService {
 		}
 		if (solicitacao.getSolicitante().getStatus() == StatusSolicitante.BLOQUEADO) {
 			throw new ConflitoException("solicitante", "O solicitante está bloqueado e não pode retirar equipamentos.");
+		}
+		// RF14: solicitante com atraso não retira outro equipamento até regularizar (RN09).
+		if (atrasos.solicitanteTemAtraso(solicitacao.getSolicitante().getId())) {
+			throw new ConflitoException("solicitante",
+					"O solicitante tem um empréstimo em atraso e só pode retirar outro equipamento depois de devolvê-lo.");
 		}
 		Instant agora = Instant.now();
 		if (!agora.isBefore(solicitacao.getDataFimPrevista())) {
@@ -89,7 +96,7 @@ public class EmprestimoService {
 		equipamento.setSituacao(Situacao.EMPRESTADO);
 		historicoService.registrarRetirada(equipamento, emprestimo, anterior, operadorId,
 				"Retirado por %s.".formatted(solicitacao.getSolicitante().getUsuario().getNome()));
-		return SolicitacaoResponse.de(solicitacao, emprestimo);
+		return SolicitacaoResponse.de(solicitacao, emprestimo, atrasos.statusAtual(emprestimo));
 	}
 
 	/**
