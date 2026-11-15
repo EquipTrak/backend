@@ -15,7 +15,7 @@ Este documento acompanha a ligação entre o front (`EquipTrak/frontend`) e esta
 |---|---|---|
 | 1 | Login, sessão, logout e perfil do usuário | Feita |
 | 2 | Equipamentos, por tela do front: 2a lista e cadastro, 2b histórico | Feita |
-| 3 | Solicitações, por tela do front: 3a criar (feita); listar, cancelar, aprovar e rejeitar | Em andamento |
+| 3 | Solicitações, por tela do front: 3a criar (feita), 3b minhas solicitações e cancelar (feita); fila do operador, aprovar e rejeitar | Em andamento |
 | 4 | Empréstimos: retirada, devolução, atraso e histórico do equipamento | Pendente |
 | 5 | Indicadores do painel, histórico por solicitante e bloqueio por atraso | Pendente |
 
@@ -170,8 +170,34 @@ No front:
 No front:
 
 - O modal mostra o prazo máximo do equipamento e valida o período antes de enviar. Os erros da API aparecem no campo de início, no de fim ou como mensagem geral.
-- A solicitação criada entra no topo de "Minhas solicitações" com o número devolvido pela API (`S-42`). Essa lista e a fila do operador ainda partem de dados de demonstração, então a nova solicitação some da tela ao recarregar a página, embora continue salva no backend. A listagem pela API é a próxima tela.
+- A solicitação criada entra no topo de "Minhas solicitações" com o número devolvido pela API (`S-42`).
 - O front ganhou o status `CANCELADA` (divergência 3).
+
+### Parte 3b: tela "Minhas solicitações"
+
+| Tela ou ação do front | Endpoint | Quem pode |
+|---|---|---|
+| Lista "Minhas solicitações" | `GET /api/solicitacoes/minhas` | `SOLICITANTE` |
+| Botão "Cancelar solicitação" | `POST /api/solicitacoes/{id}/cancelamento` | `SOLICITANTE`, só a própria |
+
+- `GET /api/solicitacoes/minhas` devolve as solicitações do usuário logado, da mais recente para a mais antiga, no mesmo formato da resposta da criação. Usuário sem cadastro de solicitante recebe `[]`.
+- `POST /api/solicitacoes/{id}/cancelamento` não tem corpo e devolve a solicitação com `status: "CANCELADA"` (RF23).
+
+  | Regra | Resposta |
+  |---|---|
+  | Solicitação inexistente ou de outro solicitante | 404 |
+  | Solicitação que não está `PENDENTE` | 409, com o motivo em `mensagem` |
+  | Perfil diferente de `SOLICITANTE` | 403 |
+
+- O momento do cancelamento fica em `data_decisao`, e `id_operador_decisao` continua nulo (RN11).
+- Depois de cancelar, o solicitante pode pedir o mesmo equipamento de novo.
+- `status` ainda traz só o status da solicitação. Os valores `RETIRADO`, `DEVOLVIDO` e `ATRASADO` da divergência 3 entram com a tabela de empréstimos (parte 4).
+
+No front:
+
+- A lista é buscada ao abrir o painel, com estados de carregando e de erro ("Tentar novamente"). Saíram os dados de demonstração do solicitante e o filtro pelo nome (divergência 7, para esta tela).
+- Cada solicitação pendente tem o botão "Cancelar solicitação", com confirmação. Se a API responder 409 ou 404, o modal mostra o motivo e a lista é recarregada.
+- A fila do operador ainda parte de dados de demonstração e é a próxima tela.
 
 ## Contrato das próximas partes
 
@@ -184,7 +210,8 @@ Endpoints propostos a partir do que as telas do front já fazem com dados de dem
 | 2a | Lista de categorias no formulário | `GET /api/categorias` (feito) | RF06 |
 | 3a | `criarSolicitacao` | `POST /api/solicitacoes` (feito) | RF08 |
 | 3 | Fila do operador | `GET /api/solicitacoes?status=` | RF09 |
-| 3 | Minhas solicitações | `GET /api/solicitacoes/minhas` | RF18 |
+| 3b | Minhas solicitações | `GET /api/solicitacoes/minhas` (feito) | RF18 |
+| 3b | `cancelarSolicitacao` | `POST /api/solicitacoes/{id}/cancelamento` (feito) | RF23 |
 | 3 | `aprovarSolicitacao` | `POST /api/solicitacoes/{id}/aprovacao` | RF09 |
 | 3 | `rejeitarSolicitacao` | `POST /api/solicitacoes/{id}/rejeicao` com `{ motivo }` | RF09 |
 | 4 | `registrarRetirada` | `POST /api/solicitacoes/{id}/retirada` | RF10 |

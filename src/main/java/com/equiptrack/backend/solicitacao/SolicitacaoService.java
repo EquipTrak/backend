@@ -6,6 +6,7 @@ import com.equiptrack.backend.equipamento.Situacao;
 import com.equiptrack.backend.exception.CampoInvalidoException;
 import com.equiptrack.backend.exception.ConflitoException;
 import com.equiptrack.backend.exception.OperacaoNaoPermitidaException;
+import com.equiptrack.backend.exception.RecursoNaoEncontradoException;
 import com.equiptrack.backend.solicitacao.dto.SolicitacaoRequest;
 import com.equiptrack.backend.solicitacao.dto.SolicitacaoResponse;
 import com.equiptrack.backend.solicitante.SituacaoMatricula;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 
 @Service
 public class SolicitacaoService {
@@ -84,6 +86,29 @@ public class SolicitacaoService {
 		solicitacao.setDataInicioPrevista(inicio);
 		solicitacao.setDataFimPrevista(fim);
 		return SolicitacaoResponse.de(solicitacaoRepository.save(solicitacao));
+	}
+
+	/** Solicitações do usuário logado, da mais recente para a mais antiga (RF18). */
+	@Transactional(readOnly = true)
+	public List<SolicitacaoResponse> listarMinhas(Long usuarioId) {
+		return solicitacaoRepository.buscarDoUsuario(usuarioId).stream().map(SolicitacaoResponse::de).toList();
+	}
+
+	/**
+	 * Cancela a própria solicitação enquanto ela estiver PENDENTE (RF23). A solicitação de outra pessoa
+	 * responde como inexistente, para não revelar que existe.
+	 */
+	@Transactional
+	public SolicitacaoResponse cancelar(Long id, Long usuarioId) {
+		SolicitacaoEmprestimo solicitacao = solicitacaoRepository.buscarDoUsuarioPorId(id, usuarioId)
+			.orElseThrow(() -> new RecursoNaoEncontradoException("Solicitação não encontrada."));
+		if (solicitacao.getStatus() != StatusSolicitacao.PENDENTE) {
+			throw new ConflitoException("status", "Só é possível cancelar uma solicitação pendente.");
+		}
+		solicitacao.setStatus(StatusSolicitacao.CANCELADA);
+		// RN11: o momento do cancelamento fica em data_decisao; id_operador_decisao segue nulo.
+		solicitacao.setDataDecisao(Instant.now());
+		return SolicitacaoResponse.de(solicitacao);
 	}
 
 }

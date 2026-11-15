@@ -10,12 +10,15 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/solicitacoes")
@@ -40,6 +43,26 @@ public class SolicitacaoController {
 			@AuthenticationPrincipal UsuarioAutenticado usuario) {
 		SolicitacaoResponse criada = solicitacaoService.criar(request, usuario.id());
 		return ResponseEntity.created(URI.create("/api/solicitacoes/" + criada.id())).body(criada);
+	}
+
+	@GetMapping("/minhas")
+	@Operation(summary = "Lista as solicitações do usuário logado, da mais recente para a mais antiga (RF18)")
+	@ApiResponse(responseCode = "200", description = "Solicitações do usuário; lista vazia se não houver")
+	@ApiResponse(responseCode = "401", description = "Token ausente, inválido, expirado ou revogado")
+	@ApiResponse(responseCode = "403", description = "Perfil sem permissão")
+	public List<SolicitacaoResponse> listarMinhas(@AuthenticationPrincipal UsuarioAutenticado usuario) {
+		return solicitacaoService.listarMinhas(usuario.id());
+	}
+
+	@PostMapping("/{id}/cancelamento")
+	@Operation(summary = "Cancela a própria solicitação enquanto estiver PENDENTE (RF23)")
+	@ApiResponse(responseCode = "200", description = "Solicitação cancelada")
+	@ApiResponse(responseCode = "401", description = "Token ausente, inválido, expirado ou revogado")
+	@ApiResponse(responseCode = "403", description = "Perfil sem permissão")
+	@ApiResponse(responseCode = "404", description = "Solicitação inexistente ou de outro solicitante")
+	@ApiResponse(responseCode = "409", description = "A solicitação não está mais pendente")
+	public SolicitacaoResponse cancelar(@PathVariable Long id, @AuthenticationPrincipal UsuarioAutenticado usuario) {
+		return solicitacaoService.cancelar(id, usuario.id());
 	}
 
 }
