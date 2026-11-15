@@ -30,6 +30,8 @@ public interface EmprestimoRepository extends JpaRepository<Emprestimo, Long> {
 	boolean existeAtrasoDoSolicitante(@Param("solicitanteId") Long solicitanteId,
 			@Param("status") StatusEmprestimo status, @Param("inicioDeHoje") java.time.Instant inicioDeHoje);
 
+	long countByStatusAndDataPrevistaDevolucaoBefore(StatusEmprestimo status, java.time.Instant instante);
+
 	@Query("select e from Emprestimo e where e.solicitacao.id in :solicitacaoIds")
 	List<Emprestimo> buscarPorSolicitacoes(@Param("solicitacaoIds") Collection<Long> solicitacaoIds);
 

@@ -58,6 +58,9 @@ public class SecurityConfig {
 				// Devolução (RF11): mesma regra.
 				.requestMatchers(HttpMethod.POST, "/api/emprestimos/*/devolucao")
 					.hasAnyRole("OPERADOR", "ENCARREGADO", "ADMINISTRADOR")
+				// Indicadores do painel (RF20): o dashboard é do operador.
+				.requestMatchers(HttpMethod.GET, "/api/painel/**")
+					.hasAnyRole("OPERADOR", "ENCARREGADO", "ADMINISTRADOR")
 				.anyRequest().authenticated())
 			.exceptionHandling(exceptions -> exceptions
 				.authenticationEntryPoint(erroSegurancaHandler)
