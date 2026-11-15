@@ -55,6 +55,9 @@ public class SecurityConfig {
 				// Retirada (RF10): mesma regra.
 				.requestMatchers(HttpMethod.POST, "/api/solicitacoes/*/retirada")
 					.hasAnyRole("OPERADOR", "ENCARREGADO", "ADMINISTRADOR")
+				// Devolução (RF11): mesma regra.
+				.requestMatchers(HttpMethod.POST, "/api/emprestimos/*/devolucao")
+					.hasAnyRole("OPERADOR", "ENCARREGADO", "ADMINISTRADOR")
 				.anyRequest().authenticated())
 			.exceptionHandling(exceptions -> exceptions
 				.authenticationEntryPoint(erroSegurancaHandler)

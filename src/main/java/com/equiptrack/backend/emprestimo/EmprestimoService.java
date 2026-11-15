@@ -1,5 +1,7 @@
 package com.equiptrack.backend.emprestimo;
 
+import com.equiptrack.backend.emprestimo.dto.DevolucaoRequest;
+import com.equiptrack.backend.equipamento.Condicao;
 import com.equiptrack.backend.equipamento.Equipamento;
 import com.equiptrack.backend.equipamento.EquipamentoRepository;
 import com.equiptrack.backend.equipamento.Situacao;
@@ -88,6 +90,41 @@ public class EmprestimoService {
 		historicoService.registrarRetirada(equipamento, emprestimo, anterior, operadorId,
 				"Retirado por %s.".formatted(solicitacao.getSolicitante().getUsuario().getNome()));
 		return SolicitacaoResponse.de(solicitacao, emprestimo);
+	}
+
+	/**
+	 * Registra a devolução (RF11) com a condição do equipamento (RN05). Equipamento devolvido com avaria
+	 * fica DANIFICADO até a avaliação (RF12, RN06); nos demais casos volta a DISPONIVEL. Empréstimo,
+	 * equipamento e histórico mudam na mesma transação (RN11).
+	 */
+	@Transactional
+	public SolicitacaoResponse registrarDevolucao(Long emprestimoId, DevolucaoRequest request, Long operadorId) {
+		Emprestimo emprestimo = emprestimoRepository.buscarPorId(emprestimoId)
+			.orElseThrow(() -> new RecursoNaoEncontradoException("Empréstimo não encontrado."));
+		if (emprestimo.getStatus() == StatusEmprestimo.DEVOLVIDO) {
+			throw new ConflitoException("status", "A devolução deste empréstimo já foi registrada.");
+		}
+
+		Equipamento equipamento = equipamentoRepository.travarPorId(emprestimo.getEquipamento().getId())
+			.orElseThrow(() -> new RecursoNaoEncontradoException("Equipamento não encontrado."));
+		String observacao = request.observacao() == null || request.observacao().isBlank() ? null
+				: request.observacao().trim();
+
+		emprestimo.setStatus(StatusEmprestimo.DEVOLVIDO);
+		// Libera a restrição única: o equipamento pode ter um novo empréstimo em aberto (RN04).
+		emprestimo.setAtivoFlag(null);
+		emprestimo.setDataDevolucao(Instant.now());
+		emprestimo.setCondicaoDevolucao(request.condicao());
+		emprestimo.setObservacaoDevolucao(observacao);
+		emprestimo.setOperadorDevolucao(usuarioRepository.getReferenceById(operadorId));
+
+		Situacao situacaoAnterior = equipamento.getSituacao();
+		Condicao condicaoAnterior = equipamento.getCondicao();
+		equipamento.setCondicao(request.condicao());
+		equipamento.setSituacao(request.condicao() == Condicao.COM_AVARIA ? Situacao.DANIFICADO : Situacao.DISPONIVEL);
+		historicoService.registrarDevolucao(equipamento, emprestimo, situacaoAnterior, condicaoAnterior, operadorId,
+				observacao);
+		return SolicitacaoResponse.de(emprestimo.getSolicitacao(), emprestimo);
 	}
 
 }
