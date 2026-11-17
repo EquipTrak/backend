@@ -35,3 +35,7 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Configuração local (senhas e chaves): o Spring Boot lê ./config/ sozinho ###
+/config/*
+!/config/*.example
