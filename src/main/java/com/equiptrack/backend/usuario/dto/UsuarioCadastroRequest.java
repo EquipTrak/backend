@@ -23,7 +23,7 @@ public record UsuarioCadastroRequest(
 		@Size(min = 8, max = 72, message = "A senha deve ter entre 8 e 72 caracteres.")
 		String senha,
 
-		@NotNull(message = "Informe o perfil: SOLICITANTE, OPERADOR, ENCARREGADO ou ADMINISTRADOR.")
+		@NotNull(message = "Informe o perfil: SOLICITANTE, OPERADOR ou ADMINISTRADOR.")
 		Perfil perfil,
 
 		@Valid

@@ -55,7 +55,7 @@ public class EquipamentoController {
 	}
 
 	@PostMapping("/equipamentos")
-	@Operation(summary = "Cadastra um equipamento (RF04). Restrito a operador, encarregado e administrador")
+	@Operation(summary = "Cadastra um equipamento (RF04). Restrito a operador e administrador")
 	@ApiResponse(responseCode = "201", description = "Equipamento cadastrado")
 	@ApiResponse(responseCode = "400", description = "Dados inválidos, categoria inexistente ou situação não permitida")
 	@ApiResponse(responseCode = "401", description = "Token ausente, inválido, expirado ou revogado")

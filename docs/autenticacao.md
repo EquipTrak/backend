@@ -87,7 +87,7 @@ Toda rota exige autenticação por padrão. Para ler o usuário logado em um con
 public Algo metodo(@AuthenticationPrincipal UsuarioAutenticado usuario) { ... }
 ```
 
-As autoridades seguem o perfil: `ROLE_SOLICITANTE`, `ROLE_OPERADOR`, `ROLE_ADMINISTRADOR` e `ROLE_ENCARREGADO`.
+As autoridades seguem o perfil: `ROLE_SOLICITANTE`, `ROLE_OPERADOR` e `ROLE_ADMINISTRADOR`.
 
 ## Configuração
 

@@ -43,9 +43,9 @@ public class SecurityConfig {
 				// Cadastro de equipamento (RF04): todo perfil que usa a visão do operador.
 				// Histórico do equipamento (RF15): mesma regra do cadastro.
 				.requestMatchers(HttpMethod.GET, "/api/equipamentos/*/historico")
-					.hasAnyRole("OPERADOR", "ENCARREGADO", "ADMINISTRADOR")
+					.hasAnyRole("OPERADOR", "ADMINISTRADOR")
 				.requestMatchers(HttpMethod.POST, "/api/equipamentos")
-					.hasAnyRole("OPERADOR", "ENCARREGADO", "ADMINISTRADOR")
+					.hasAnyRole("OPERADOR", "ADMINISTRADOR")
 				// Criar solicitação (RF08): só quem tem perfil de solicitante.
 				.requestMatchers(HttpMethod.POST, "/api/solicitacoes").hasRole("SOLICITANTE")
 				// Minhas solicitações (RF18) e cancelamento (RF23): também só do solicitante.
@@ -53,18 +53,18 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.POST, "/api/solicitacoes/*/cancelamento").hasRole("SOLICITANTE")
 				// Fila, aprovação e rejeição (RF09): perfis com a visão do operador.
 				.requestMatchers(HttpMethod.GET, "/api/solicitacoes")
-					.hasAnyRole("OPERADOR", "ENCARREGADO", "ADMINISTRADOR")
+					.hasAnyRole("OPERADOR", "ADMINISTRADOR")
 				.requestMatchers(HttpMethod.POST, "/api/solicitacoes/*/aprovacao", "/api/solicitacoes/*/rejeicao")
-					.hasAnyRole("OPERADOR", "ENCARREGADO", "ADMINISTRADOR")
+					.hasAnyRole("OPERADOR", "ADMINISTRADOR")
 				// Retirada (RF10): mesma regra.
 				.requestMatchers(HttpMethod.POST, "/api/solicitacoes/*/retirada")
-					.hasAnyRole("OPERADOR", "ENCARREGADO", "ADMINISTRADOR")
+					.hasAnyRole("OPERADOR", "ADMINISTRADOR")
 				// Devolução (RF11): mesma regra.
 				.requestMatchers(HttpMethod.POST, "/api/emprestimos/*/devolucao")
-					.hasAnyRole("OPERADOR", "ENCARREGADO", "ADMINISTRADOR")
+					.hasAnyRole("OPERADOR", "ADMINISTRADOR")
 				// Indicadores do painel (RF20): o dashboard é do operador.
 				.requestMatchers(HttpMethod.GET, "/api/painel/**")
-					.hasAnyRole("OPERADOR", "ENCARREGADO", "ADMINISTRADOR")
+					.hasAnyRole("OPERADOR", "ADMINISTRADOR")
 				// Gestão de usuários: só desenvolvedores, pela chave; nenhum perfil do sistema tem acesso.
 				.requestMatchers("/api/usuarios", "/api/usuarios/**").hasRole(ChaveDesenvolvedorFilter.PAPEL)
 				.anyRequest().authenticated())

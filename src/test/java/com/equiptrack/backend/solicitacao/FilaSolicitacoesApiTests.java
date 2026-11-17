@@ -79,7 +79,7 @@ class FilaSolicitacoesApiTests {
 	private Solicitante rafael;
 	private Solicitante beatriz;
 	private String tokenOperador;
-	private String tokenEncarregado;
+	private String tokenAdministrador;
 	private String tokenRafael;
 
 	private final Instant amanha = Instant.now().plus(1, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MINUTES);
@@ -91,11 +91,11 @@ class FilaSolicitacoesApiTests {
 		projetor = salvarEquipamento("PJ-0001", Situacao.DISPONIVEL);
 		notebook = salvarEquipamento("NB-0001", Situacao.DISPONIVEL);
 		operador = criarUsuario("Marina Souza", "operador@equiptrack.local", Perfil.OPERADOR);
-		criarUsuario("Encarregado", "encarregado@equiptrack.local", Perfil.ENCARREGADO);
+		criarUsuario("Administrador", "administrador@equiptrack.local", Perfil.ADMINISTRADOR);
 		rafael = criarSolicitante("Rafael Lima", "rafael@equiptrack.local", "MAT-1");
 		beatriz = criarSolicitante("Beatriz Alves", "beatriz@equiptrack.local", "MAT-2");
 		tokenOperador = entrar("operador@equiptrack.local");
-		tokenEncarregado = entrar("encarregado@equiptrack.local");
+		tokenAdministrador = entrar("administrador@equiptrack.local");
 		tokenRafael = entrar("rafael@equiptrack.local");
 	}
 
@@ -163,10 +163,10 @@ class FilaSolicitacoesApiTests {
 	}
 
 	@Test
-	void encarregadoTambemAprova() throws Exception {
+	void administradorTambemAprova() throws Exception {
 		SolicitacaoEmprestimo solicitacao = salvar(rafael, projetor, amanha, 2, StatusSolicitacao.PENDENTE);
 
-		decidir(solicitacao.getId(), "aprovacao", tokenEncarregado, null).andExpect(status().isOk());
+		decidir(solicitacao.getId(), "aprovacao", tokenAdministrador, null).andExpect(status().isOk());
 	}
 
 	@Test

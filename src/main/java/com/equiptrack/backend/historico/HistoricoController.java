@@ -26,7 +26,7 @@ public class HistoricoController {
 
 	@GetMapping("/{patrimonio}/historico")
 	@Operation(summary = "Histórico do equipamento, do evento mais recente para o mais antigo (RF15). "
-			+ "Restrito a operador, encarregado e administrador")
+			+ "Restrito a operador e administrador")
 	@ApiResponse(responseCode = "200", description = "Eventos do equipamento")
 	@ApiResponse(responseCode = "401", description = "Token ausente, inválido, expirado ou revogado")
 	@ApiResponse(responseCode = "403", description = "Perfil sem permissão (solicitante)")
