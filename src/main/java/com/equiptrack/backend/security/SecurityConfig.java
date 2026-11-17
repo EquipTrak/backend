@@ -1,6 +1,7 @@
 package com.equiptrack.backend.security;
 
 import com.equiptrack.backend.auth.AuthService;
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeIn;
 import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
 import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,11 +24,14 @@ import java.util.List;
 
 @Configuration
 @SecurityScheme(name = "bearer", type = SecuritySchemeType.HTTP, scheme = "bearer")
+@SecurityScheme(name = "chaveDesenvolvedor", type = SecuritySchemeType.APIKEY, in = SecuritySchemeIn.HEADER,
+		paramName = ChaveDesenvolvedorFilter.CABECALHO)
 public class SecurityConfig {
 
 	@Bean
 	SecurityFilterChain securityFilterChain(HttpSecurity http, AuthService authService,
-			ErroSegurancaHandler erroSegurancaHandler) throws Exception {
+			ErroSegurancaHandler erroSegurancaHandler,
+			@Value("${equiptrack.desenvolvedor.chave}") String chaveDesenvolvedor) throws Exception {
 		return http
 			// A API não usa cookies: o token vai no cabeçalho Authorization, então não há superfície de CSRF.
 			.csrf(AbstractHttpConfigurer::disable)
@@ -61,11 +65,14 @@ public class SecurityConfig {
 				// Indicadores do painel (RF20): o dashboard é do operador.
 				.requestMatchers(HttpMethod.GET, "/api/painel/**")
 					.hasAnyRole("OPERADOR", "ENCARREGADO", "ADMINISTRADOR")
+				// Gestão de usuários: só desenvolvedores, pela chave; nenhum perfil do sistema tem acesso.
+				.requestMatchers("/api/usuarios", "/api/usuarios/**").hasRole(ChaveDesenvolvedorFilter.PAPEL)
 				.anyRequest().authenticated())
 			.exceptionHandling(exceptions -> exceptions
 				.authenticationEntryPoint(erroSegurancaHandler)
 				.accessDeniedHandler(erroSegurancaHandler))
 			.addFilterBefore(new TokenAuthenticationFilter(authService), UsernamePasswordAuthenticationFilter.class)
+			.addFilterAfter(new ChaveDesenvolvedorFilter(chaveDesenvolvedor), TokenAuthenticationFilter.class)
 			.build();
 	}
 

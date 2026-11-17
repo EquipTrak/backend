@@ -32,6 +32,12 @@ public interface EmprestimoRepository extends JpaRepository<Emprestimo, Long> {
 
 	long countByStatusAndDataPrevistaDevolucaoBefore(StatusEmprestimo status, java.time.Instant instante);
 
+	/** Empréstimos em que o usuário registrou a retirada ou a devolução. */
+	@Query("""
+			select count(e) > 0 from Emprestimo e
+			where e.operadorRetirada.id = :usuarioId or e.operadorDevolucao.id = :usuarioId""")
+	boolean existeRegistroDoOperador(@Param("usuarioId") Long usuarioId);
+
 	@Query("select e from Emprestimo e where e.solicitacao.id in :solicitacaoIds")
 	List<Emprestimo> buscarPorSolicitacoes(@Param("solicitacaoIds") Collection<Long> solicitacaoIds);
 

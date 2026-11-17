@@ -359,11 +359,59 @@ No front:
 - O operador busca os totais ao abrir o painel e de novo depois de cadastrar, registrar retirada ou registrar devolução.
 - Se a API falhar, e para o solicitante (que também vê a faixa na tela Disponíveis), os totais continuam contados nas listas já carregadas. Para o solicitante, "Atrasados" conta só os dele.
 
+## Gestão de usuários pelos desenvolvedores
+
+O sistema é de uso interno e não tem tela de cadastro de usuários: todo usuário além dos de demonstração é criado pelos desenvolvedores, direto na API, com o seu perfil (`SOLICITANTE`, `OPERADOR`, `ENCARREGADO` ou `ADMINISTRADOR`).
+
+Acesso:
+
+- Toda chamada leva o cabeçalho `X-Chave-Desenvolvedor` com a chave da variável de ambiente `EQUIPTRACK_CHAVE_DESENVOLVEDOR`.
+- Sem a variável, as rotas ficam fechadas para todos.
+- Chave ausente ou errada recebe 401. O token de login não dá acesso: mesmo o administrador recebe 403.
+- No Swagger, a chave entra pelo botão "Authorize", no campo `chaveDesenvolvedor`.
+
+| Ação | Endpoint | Respostas |
+|---|---|---|
+| Listar todos (ativos e inativos) | `GET /api/usuarios` | 200 |
+| Buscar um | `GET /api/usuarios/{id}` | 200, 404 |
+| Cadastrar | `POST /api/usuarios` | 201, 400, 409 |
+| Atualizar | `PATCH /api/usuarios/{id}` | 200, 400, 404, 409 |
+| Excluir | `DELETE /api/usuarios/{id}` | 204, 404, 409 |
+
+Cadastro:
+
+```json
+{
+  "nome": "Ana Costa",
+  "email": "ana.costa@univille.br",
+  "senha": "uma-senha-forte",
+  "perfil": "SOLICITANTE",
+  "solicitante": { "tipo": "ALUNO", "matricula": "2026-0001", "telefone": "47 99999-0000" }
+}
+```
+
+Regras:
+
+- O e-mail é guardado em minúsculas e não pode repetir (409 em `email`). A senha tem de 8 a 72 caracteres e nunca sai da API, nem como hash.
+- `solicitante` é obrigatório para o perfil `SOLICITANTE`, que precisa dele para pedir equipamentos (RF07), e proibido para os outros perfis (400). A matrícula não pode repetir (409 em `solicitante.matricula`).
+- No `PATCH`, só os campos enviados mudam. `"ativo": false` desativa o usuário, que deixa de entrar no sistema; `"ativo": true` o reativa.
+- Nova senha, novo perfil ou desativação encerram na hora as sessões abertas do usuário.
+- Passar um usuário para `SOLICITANTE` exige `solicitante`, a menos que ele já tenha esses dados.
+- Só é excluído quem ainda não deixou registros. Quem aparece no histórico, em empréstimos ou em solicitações recebe 409 (RN08, RN12) e deve ser desativado.
+
+Exemplo com curl:
+
+```bash
+curl -X POST http://localhost:8080/api/usuarios -H "X-Chave-Desenvolvedor: $EQUIPTRACK_CHAVE_DESENVOLVEDOR" -H "Content-Type: application/json" -d '{"nome":"Ana Costa","email":"ana.costa@univille.br","senha":"uma-senha-forte","perfil":"OPERADOR"}'
+```
+
+O RF03 previa que o administrador cadastrasse, editasse e desativasse usuários. Por decisão da equipe, isso ficou com os desenvolvedores, pela API.
+
 ## Fora da integração
 
 Requisitos que ainda não têm tela no front, e por isso ficaram sem endpoint:
 
-- RF03 e RF07: cadastro de usuários e de solicitantes (hoje só os de demonstração, no perfil `dev`).
+- RF03 e RF07: tela de cadastro de usuários e de solicitantes. O cadastro em si é feito pelos desenvolvedores na API (ver "Gestão de usuários pelos desenvolvedores").
 - RF05: edição de equipamento; RF06: gestão de categorias.
 - RF16: histórico por solicitante.
 - RF21: exceção do administrador ao bloqueio por atraso.

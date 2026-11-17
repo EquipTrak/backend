@@ -10,4 +10,6 @@ public interface SolicitanteRepository extends JpaRepository<Solicitante, Long> 
 
 	boolean existsByMatricula(String matricula);
 
+	Optional<Solicitante> findByMatricula(String matricula);
+
 }
