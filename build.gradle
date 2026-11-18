@@ -40,3 +40,8 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+// Nome fixo do jar executável, para o Dockerfile copiar sem depender da versão.
+tasks.named('bootJar') {
+	archiveFileName = 'app.jar'
+}
