@@ -39,3 +39,6 @@ out/
 ### Configuração local (senhas e chaves): o Spring Boot lê ./config/ sozinho ###
 /config/*
 !/config/*.example
+
+### Variáveis do Docker Compose (senhas): só o modelo .env.example vai para o Git ###
+/.env

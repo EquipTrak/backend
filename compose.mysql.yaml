@@ -1,0 +1,69 @@
+# EquipTrack completo em contêineres: MySQL + backend + front.
+#
+# Uso (veja o README, seção "Rodar tudo com Docker"):
+#   1. copie .env.example para .env e preencha as senhas e a chave;
+#   2. docker compose -f compose.mysql.yaml up --build
+#
+# Os repositórios backend e frontend precisam estar lado a lado, na mesma pasta (o instalar-equiptrack.ps1
+# já deixa assim): o front é construído a partir de ../frontend.
+#
+# Este arquivo NÃO se chama compose.yaml de propósito: o Spring Boot sobe sozinho o compose.yaml
+# da pasta quando se roda ./gradlew bootRun, e aqui isso não é desejado.
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: equiptrack-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Defina MYSQL_ROOT_PASSWORD no arquivo .env}
+      MYSQL_DATABASE: equiptrack
+      MYSQL_USER: equiptrack
+      MYSQL_PASSWORD: ${DB_SENHA:?Defina DB_SENHA no arquivo .env}
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_ai_ci
+    volumes:
+      # Os dados ficam neste volume e sobrevivem a "docker compose down". Para apagar tudo: down -v.
+      - mysql-dados:/var/lib/mysql
+    ports:
+      # 3307 no computador, para não bater com um MySQL instalado na porta 3306.
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  backend:
+    build: .
+    container_name: equiptrack-backend
+    restart: on-failure
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: mysql
+      # allowPublicKeyRetrieval: o usuário do MySQL 8 usa caching_sha2_password; sem isso a primeira conexão
+      # pode ser recusada quando o TLS não é negociado. A rede é interna ao compose.
+      DB_URL: jdbc:mysql://mysql:3306/equiptrack?allowPublicKeyRetrieval=true
+      DB_USUARIO: equiptrack
+      DB_SENHA: ${DB_SENHA:?Defina DB_SENHA no arquivo .env}
+      EQUIPTRACK_CHAVE_DESENVOLVEDOR: ${EQUIPTRACK_CHAVE_DESENVOLVEDOR:?Defina EQUIPTRACK_CHAVE_DESENVOLVEDOR no arquivo .env}
+      FUSO_HORARIO: ${FUSO_HORARIO:-America/Sao_Paulo}
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build: ../frontend
+    container_name: equiptrack-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      # Dentro da rede do compose, o backend é alcançado pelo nome do serviço.
+      API_URL: http://backend:8080
+    ports:
+      - "4200:4200"
+
+volumes:
+  mysql-dados:

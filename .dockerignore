@@ -1,0 +1,11 @@
+# O contexto do build só precisa do código e dos arquivos do Gradle.
+# config/ guarda a senha local do MySQL e .env guarda as senhas do compose: nunca podem entrar na imagem.
+.git
+.gradle
+.idea
+.vscode
+build
+config
+.env
+docs
+*.md
