@@ -14,6 +14,10 @@ public interface EquipamentoRepository extends JpaRepository<Equipamento, Long> 
 
 	java.util.Optional<Equipamento> findByPatrimonioIgnoreCase(String patrimonio);
 
+	long countByAtivoTrueAndSituacao(Situacao situacao);
+
+	long countByAtivoTrue();
+
 	/**
 	 * Busca o equipamento travando a linha até o fim da transação, para que duas decisões simultâneas sobre o
 	 * mesmo equipamento rodem uma depois da outra (RNF06).

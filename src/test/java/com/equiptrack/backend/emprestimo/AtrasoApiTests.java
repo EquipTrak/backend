@@ -82,7 +82,6 @@ class AtrasoApiTests {
 	private Equipamento projetor;
 	private Usuario operador;
 	private Solicitante rafael;
-	private Solicitante beatriz;
 	private String tokenOperador;
 	private String tokenRafael;
 	private String tokenBeatriz;
@@ -97,7 +96,7 @@ class AtrasoApiTests {
 		projetor = salvarEquipamento("PJ-0001", Situacao.DISPONIVEL);
 		operador = criarUsuario("Marina Souza", "operador@equiptrack.local", Perfil.OPERADOR);
 		rafael = criarSolicitante("Rafael Lima", "rafael@equiptrack.local", "MAT-1");
-		beatriz = criarSolicitante("Beatriz Alves", "beatriz@equiptrack.local", "MAT-2");
+		criarSolicitante("Beatriz Alves", "beatriz@equiptrack.local", "MAT-2");
 		tokenOperador = entrar("operador@equiptrack.local");
 		tokenRafael = entrar("rafael@equiptrack.local");
 		tokenBeatriz = entrar("beatriz@equiptrack.local");

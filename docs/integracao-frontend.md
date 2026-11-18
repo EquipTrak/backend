@@ -17,7 +17,7 @@ Este documento acompanha a ligação entre o front (`EquipTrak/frontend`) e esta
 | 2 | Equipamentos, por tela do front: 2a lista e cadastro, 2b histórico | Feita |
 | 3 | Solicitações, por tela do front: 3a criar, 3b minhas solicitações e cancelar, 3c fila do operador, aprovar e rejeitar | Feita |
 | 4 | Empréstimos, por tela do front: 4a retirada, 4b devolução e 4c atraso com bloqueio | Feita |
-| 5 | Indicadores do painel, histórico por solicitante e bloqueio por atraso | Pendente |
+| 5 | Indicadores do painel (o bloqueio por atraso entrou na 4c) | Feita |
 
 ### Parte 1: autenticação
 
@@ -338,24 +338,56 @@ No front:
 - A aba "Atrasados" da fila, o indicador "Atrasados" do painel e "Minhas solicitações" passam a mostrar os atrasos vindos da API.
 - Na tela Disponíveis, o solicitante com atraso vê o aviso "Novas solicitações bloqueadas", e o botão "Solicitar" fica desabilitado. A verificação não compara mais o nome do usuário.
 
-## Contrato das próximas partes
+### Parte 5: faixa de indicadores do painel
 
-Endpoints propostos a partir do que as telas do front já fazem com dados de demonstração. Eles servem de ponto de partida e podem mudar na revisão de cada parte.
+| Tela ou ação do front | Endpoint | Quem pode |
+|---|---|---|
+| Faixa "Disponíveis / Emprestados / Atrasados / Indisponíveis" do operador | `GET /api/painel/indicadores` | `OPERADOR`, `ENCARREGADO` e `ADMINISTRADOR` |
 
-| Parte | Ação no front (`EquipTrackService`) | Endpoint proposto | Requisitos |
+- Resposta:
+
+  ```json
+  { "disponiveis": 3, "emprestados": 2, "atrasados": 1, "indisponiveis": 1, "total": 6 }
+  ```
+
+- Contam só os equipamentos ativos. `indisponiveis` soma `DANIFICADO` e `EM_MANUTENCAO`.
+- `atrasados` conta os empréstimos em aberto que já passaram do dia previsto (mesma regra da parte 4c). Como todo atrasado também é emprestado, os quatro totais não somam `total` (RF20).
+- O perfil `SOLICITANTE` recebe 403, pois os requisitos dão o dashboard ao operador.
+
+No front:
+
+- O operador busca os totais ao abrir o painel e de novo depois de cadastrar, registrar retirada ou registrar devolução.
+- Se a API falhar, e para o solicitante (que também vê a faixa na tela Disponíveis), os totais continuam contados nas listas já carregadas. Para o solicitante, "Atrasados" conta só os dele.
+
+## Fora da integração
+
+Requisitos que ainda não têm tela no front, e por isso ficaram sem endpoint:
+
+- RF03 e RF07: cadastro de usuários e de solicitantes (hoje só os de demonstração, no perfil `dev`).
+- RF05: edição de equipamento; RF06: gestão de categorias.
+- RF16: histórico por solicitante.
+- RF21: exceção do administrador ao bloqueio por atraso.
+- RF22 e RF24: avaliação do equipamento devolvido com avaria e correção de registros.
+- Tabelas do DER sem uso ainda: `prorrogacao`, `multa`, `bloqueio`, `correcao`, `alerta_atraso` e `visualizacao_alerta`.
+
+## Resumo dos endpoints
+
+Todas as ações que o front fazia com dados de demonstração já usam a API. A tabela reúne o endpoint de cada uma.
+
+| Parte | Ação no front (`EquipTrackService`) | Endpoint | Requisitos |
 |---|---|---|---|
-| 2a | Lista de equipamentos e filtros | `GET /api/equipamentos?situacao=&categoriaId=&busca=` (feito) | RF05, RF19 |
-| 2a | `cadastrarEquipamento` | `POST /api/equipamentos` (feito) | RF04 |
-| 2a | Lista de categorias no formulário | `GET /api/categorias` (feito) | RF06 |
-| 3a | `criarSolicitacao` | `POST /api/solicitacoes` (feito) | RF08 |
-| 3c | Fila do operador | `GET /api/solicitacoes?status=` (feito) | RF09 |
-| 3b | Minhas solicitações | `GET /api/solicitacoes/minhas` (feito) | RF18 |
-| 3b | `cancelarSolicitacao` | `POST /api/solicitacoes/{id}/cancelamento` (feito) | RF23 |
-| 3c | `aprovarSolicitacao` | `POST /api/solicitacoes/{id}/aprovacao` (feito) | RF09, RN13 |
-| 3c | `rejeitarSolicitacao` | `POST /api/solicitacoes/{id}/rejeicao` com `{ motivo }` (feito) | RF09 |
-| 4a | `registrarRetirada` | `POST /api/solicitacoes/{id}/retirada` (feito) | RF10, RN02, RN04 |
-| 4b | `registrarDevolucao` | `POST /api/emprestimos/{id}/devolucao` com `{ condicao, observacao }` (feito) | RF11, RF12, RN05, RN06 |
-| 2b | Gaveta de histórico | `GET /api/equipamentos/{patrimonio}/historico` (feito) | RF15 |
+| 2a | Lista de equipamentos e filtros | `GET /api/equipamentos?situacao=&categoriaId=&busca=` | RF05, RF19 |
+| 2a | `cadastrarEquipamento` | `POST /api/equipamentos` | RF04 |
+| 2a | Lista de categorias no formulário | `GET /api/categorias` | RF06 |
+| 3a | `criarSolicitacao` | `POST /api/solicitacoes` | RF08 |
+| 3c | Fila do operador | `GET /api/solicitacoes?status=` | RF09 |
+| 3b | Minhas solicitações | `GET /api/solicitacoes/minhas` | RF18 |
+| 3b | `cancelarSolicitacao` | `POST /api/solicitacoes/{id}/cancelamento` | RF23 |
+| 3c | `aprovarSolicitacao` | `POST /api/solicitacoes/{id}/aprovacao` | RF09, RN13 |
+| 3c | `rejeitarSolicitacao` | `POST /api/solicitacoes/{id}/rejeicao` com `{ motivo }` | RF09 |
+| 4a | `registrarRetirada` | `POST /api/solicitacoes/{id}/retirada` | RF10, RN02, RN04 |
+| 4b | `registrarDevolucao` | `POST /api/emprestimos/{id}/devolucao` com `{ condicao, observacao }` | RF11, RF12, RN05, RN06 |
+| 2b | Gaveta de histórico | `GET /api/equipamentos/{patrimonio}/historico` | RF15 |
 | 5 | Faixa de indicadores | `GET /api/painel/indicadores` | RF20 |
 
 ## Divergências entre front e DER

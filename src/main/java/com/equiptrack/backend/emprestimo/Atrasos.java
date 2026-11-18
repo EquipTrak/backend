@@ -50,6 +50,11 @@ public class Atrasos {
 		return emprestimoRepository.existeAtrasoDoSolicitante(solicitanteId, StatusEmprestimo.ATIVO, inicioDeHoje());
 	}
 
+	/** Empréstimos em aberto que já estão atrasados, para o indicador do painel (RF20). */
+	public long contarAtrasados() {
+		return emprestimoRepository.countByStatusAndDataPrevistaDevolucaoBefore(StatusEmprestimo.ATIVO, inicioDeHoje());
+	}
+
 	/** Primeiro instante de hoje no fuso: previsão de devolução antes dele já está atrasada. */
 	Instant inicioDeHoje() {
 		return LocalDate.ofInstant(clock.instant(), fuso).atStartOfDay(fuso).toInstant();
