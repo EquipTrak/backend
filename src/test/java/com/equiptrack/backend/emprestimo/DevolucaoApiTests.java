@@ -8,6 +8,7 @@ import com.equiptrack.backend.equipamento.Equipamento;
 import com.equiptrack.backend.equipamento.EquipamentoRepository;
 import com.equiptrack.backend.equipamento.Situacao;
 import com.equiptrack.backend.historico.HistoricoEquipamentoRepository;
+import com.equiptrack.backend.historico.TipoEvento;
 import com.equiptrack.backend.solicitacao.SolicitacaoEmprestimo;
 import com.equiptrack.backend.solicitacao.SolicitacaoRepository;
 import com.equiptrack.backend.solicitacao.StatusSolicitacao;
@@ -20,6 +21,7 @@ import com.equiptrack.backend.usuario.UsuarioRepository;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -31,6 +33,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.time.temporal.ChronoUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -236,6 +243,48 @@ class DevolucaoApiTests {
 	}
 
 	/** Aprova e retira pela API, como no fluxo real; devolve o id do empréstimo. */
+	/**
+	 * Duas devoluções simultâneas do mesmo empréstimo: só uma pode valer. A outra recebe 409 e não grava
+	 * evento nem altera a condição. Sem a trava no empréstimo, as duas passavam pela checagem de status e a
+	 * segunda sobrescrevia a primeira (um equipamento com avaria podia voltar como DISPONIVEL).
+	 */
+	@RepeatedTest(15)
+	void devolucoesSimultaneasDoMesmoEmprestimoGravamUmaSoVez() throws Exception {
+		Long emprestimoId = retirar(rafael);
+		CyclicBarrier largada = new CyclicBarrier(2);
+		ExecutorService pool = Executors.newFixedThreadPool(2);
+		try {
+			Future<Integer> comAvaria = pool.submit(() -> {
+				largada.await();
+				return devolver(emprestimoId, tokenOperador, "{\"condicao\":\"COM_AVARIA\"}")
+					.andReturn().getResponse().getStatus();
+			});
+			Future<Integer> semAvaria = pool.submit(() -> {
+				largada.await();
+				return devolver(emprestimoId, tokenOperador, "{\"condicao\":\"OTIMA\"}")
+					.andReturn().getResponse().getStatus();
+			});
+			List<Integer> respostas = List.of(comAvaria.get(), semAvaria.get());
+			assertThat(respostas).containsExactlyInAnyOrder(200, 409);
+
+			long eventosDeDevolucao = historicoRepository.findAll().stream()
+				.filter(evento -> evento.getTipo() == TipoEvento.DEVOLUCAO)
+				.count();
+			assertThat(eventosDeDevolucao).isEqualTo(1);
+
+			// A condição do equipamento é a da devolução que venceu, nunca uma mistura das duas.
+			Emprestimo emprestimo = emprestimoRepository.findById(emprestimoId).orElseThrow();
+			Equipamento equipamento = equipamentoRepository.findById(projetor.getId()).orElseThrow();
+			assertThat(equipamento.getCondicao()).isEqualTo(emprestimo.getCondicaoDevolucao());
+			assertThat(equipamento.getSituacao())
+				.isEqualTo(emprestimo.getCondicaoDevolucao() == Condicao.COM_AVARIA ? Situacao.DANIFICADO
+						: Situacao.DISPONIVEL);
+		}
+		finally {
+			pool.shutdownNow();
+		}
+	}
+
 	private Long retirar(Solicitante solicitante) throws Exception {
 		SolicitacaoEmprestimo solicitacao = salvarAprovada(solicitante);
 		String resposta = mockMvc.perform(post("/api/solicitacoes/" + solicitacao.getId() + "/retirada")
