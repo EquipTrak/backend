@@ -56,6 +56,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		return resposta(HttpStatus.NOT_FOUND, ex.getMessage(), request);
 	}
 
+	@ExceptionHandler(OperacaoNaoPermitidaException.class)
+	ResponseEntity<ErroResponse> operacaoNaoPermitida(OperacaoNaoPermitidaException ex, HttpServletRequest request) {
+		return resposta(HttpStatus.FORBIDDEN, ex.getMessage(), request);
+	}
+
 	@ExceptionHandler(ConflitoException.class)
 	ResponseEntity<ErroResponse> conflito(ConflitoException ex, HttpServletRequest request) {
 		HttpStatus status = HttpStatus.CONFLICT;

@@ -41,6 +41,8 @@ Todos usam a mesma senha:
 | `rafael.lima@equiptrack.local` | Solicitante |
 | `beatriz.alves@equiptrack.local` | Solicitante |
 
+Os dois solicitantes também ganham o cadastro de solicitante (matrículas `DEMO-0001` e `DEMO-0002`), necessário para criar solicitações.
+
 ## Front-end
 
 O front (repositório `EquipTrak/frontend`) chama esta API pelo prefixo `/api`. Com o backend na porta 8080, rode `npm start` no front e acesse `http://localhost:4200`.

@@ -15,7 +15,7 @@ Este documento acompanha a ligação entre o front (`EquipTrak/frontend`) e esta
 |---|---|---|
 | 1 | Login, sessão, logout e perfil do usuário | Feita |
 | 2 | Equipamentos, por tela do front: 2a lista e cadastro, 2b histórico | Feita |
-| 3 | Solicitações: criar, listar, aprovar, rejeitar e cancelar | Pendente |
+| 3 | Solicitações, por tela do front: 3a criar (feita); listar, cancelar, aprovar e rejeitar | Em andamento |
 | 4 | Empréstimos: retirada, devolução, atraso e histórico do equipamento | Pendente |
 | 5 | Indicadores do painel, histórico por solicitante e bloqueio por atraso | Pendente |
 
@@ -117,6 +117,62 @@ No front:
 - O solicitante não abre a gaveta: a busca rápida ignora o clique em equipamento para esse perfil.
 - Saiu o histórico fixo de demonstração. Os eventos das ações que ainda são locais (solicitações, retirada e devolução) continuam aparecendo no topo da gaveta até recarregar a página.
 
+### Parte 3a: botão "Solicitar" da tela Disponíveis
+
+| Tela ou ação do front | Endpoint | Quem pode |
+|---|---|---|
+| Modal "Solicitar empréstimo", botão "Enviar solicitação" | `POST /api/solicitacoes` | `SOLICITANTE` |
+
+- Corpo, com as datas em ISO-8601 (UTC):
+
+  ```json
+  {
+    "equipamentoId": 3,
+    "inicioPrevisto": "2026-11-20T12:00:00Z",
+    "fimPrevisto": "2026-11-20T15:00:00Z"
+  }
+  ```
+
+- A resposta é 201, com o cabeçalho `Location`:
+
+  ```json
+  {
+    "id": 42,
+    "solicitante": { "id": 1, "nome": "Rafael Lima" },
+    "equipamento": { "id": 3, "patrimonio": "PJ-0001", "descricao": "Projetor Epson" },
+    "dataSolicitacao": "2026-11-15T12:00:00Z",
+    "inicioPrevisto": "2026-11-20T12:00:00Z",
+    "fimPrevisto": "2026-11-20T15:00:00Z",
+    "status": "PENDENTE",
+    "motivoRejeicao": null
+  }
+  ```
+
+- O solicitante é sempre o usuário logado; o corpo não informa quem pede. `solicitante.id` é o `id_solicitante` do DER, não o id do usuário.
+
+  | Regra | Resposta |
+  |---|---|
+  | `equipamentoId`, `inicioPrevisto` e `fimPrevisto` obrigatórios | 400 |
+  | Início no passado (RN10), com folga de 5 minutos para o relógio do formulário | 400 em `campos.inicioPrevisto` |
+  | Fim igual ou anterior ao início (RN10) | 400 em `campos.fimPrevisto` |
+  | Período maior que o `prazoMaxHoras` do equipamento | 400 em `campos.fimPrevisto` |
+  | Equipamento inexistente ou inativo | 400 em `campos.equipamentoId` |
+  | Equipamento que não está `DISPONIVEL` (RN02) | 409 em `campos.equipamentoId` |
+  | O mesmo solicitante já tem solicitação `PENDENTE` para o equipamento | 409 em `campos.equipamentoId` |
+  | Usuário sem cadastro de solicitante, com status `BLOQUEADO` ou matrícula `INATIVA` | 403, com o motivo em `mensagem` |
+  | Perfil diferente de `SOLICITANTE` | 403 |
+
+- Criar a solicitação não muda a situação do equipamento (RN14) nem gera evento no histórico: o `tipo_evento` do DER não tem valor para solicitação.
+- Dois solicitantes podem pedir o mesmo equipamento; a sobreposição de períodos (RN13) é verificada na aprovação.
+- O bloqueio por atraso (RF14) depende da tabela de empréstimos e entra na parte 4. Por ora só o status `BLOQUEADO` do solicitante impede a criação.
+- Entraram as tabelas `solicitante` e `solicitacao_emprestimo` do DER. No perfil `dev`, Rafael Lima e Beatriz Alves ganham o cadastro de solicitante (`SolicitantesDevInitializer`), pois ainda não há tela para o RF07.
+
+No front:
+
+- O modal mostra o prazo máximo do equipamento e valida o período antes de enviar. Os erros da API aparecem no campo de início, no de fim ou como mensagem geral.
+- A solicitação criada entra no topo de "Minhas solicitações" com o número devolvido pela API (`S-42`). Essa lista e a fila do operador ainda partem de dados de demonstração, então a nova solicitação some da tela ao recarregar a página, embora continue salva no backend. A listagem pela API é a próxima tela.
+- O front ganhou o status `CANCELADA` (divergência 3).
+
 ## Contrato das próximas partes
 
 Endpoints propostos a partir do que as telas do front já fazem com dados de demonstração. Eles servem de ponto de partida e podem mudar na revisão de cada parte.
@@ -126,7 +182,7 @@ Endpoints propostos a partir do que as telas do front já fazem com dados de dem
 | 2a | Lista de equipamentos e filtros | `GET /api/equipamentos?situacao=&categoriaId=&busca=` (feito) | RF05, RF19 |
 | 2a | `cadastrarEquipamento` | `POST /api/equipamentos` (feito) | RF04 |
 | 2a | Lista de categorias no formulário | `GET /api/categorias` (feito) | RF06 |
-| 3 | `criarSolicitacao` | `POST /api/solicitacoes` | RF08 |
+| 3a | `criarSolicitacao` | `POST /api/solicitacoes` (feito) | RF08 |
 | 3 | Fila do operador | `GET /api/solicitacoes?status=` | RF09 |
 | 3 | Minhas solicitações | `GET /api/solicitacoes/minhas` | RF18 |
 | 3 | `aprovarSolicitacao` | `POST /api/solicitacoes/{id}/aprovacao` | RF09 |
