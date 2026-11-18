@@ -37,6 +37,9 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
 				.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 				// Cadastro de equipamento (RF04): todo perfil que usa a visão do operador.
+				// Histórico do equipamento (RF15): mesma regra do cadastro.
+				.requestMatchers(HttpMethod.GET, "/api/equipamentos/*/historico")
+					.hasAnyRole("OPERADOR", "ENCARREGADO", "ADMINISTRADOR")
 				.requestMatchers(HttpMethod.POST, "/api/equipamentos")
 					.hasAnyRole("OPERADOR", "ENCARREGADO", "ADMINISTRADOR")
 				.anyRequest().authenticated())

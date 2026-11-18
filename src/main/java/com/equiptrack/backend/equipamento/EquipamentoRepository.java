@@ -10,6 +10,8 @@ public interface EquipamentoRepository extends JpaRepository<Equipamento, Long> 
 
 	boolean existsByPatrimonioIgnoreCase(String patrimonio);
 
+	java.util.Optional<Equipamento> findByPatrimonioIgnoreCase(String patrimonio);
+
 	/**
 	 * Lista os equipamentos ativos. Cada filtro nulo é ignorado; {@code busca} já chega em minúsculas e
 	 * entre {@code %}, e procura no patrimônio e na descrição.

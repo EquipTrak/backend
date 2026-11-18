@@ -51,6 +51,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 				Map.of(ex.getCampo(), ex.getMessage())));
 	}
 
+	@ExceptionHandler(RecursoNaoEncontradoException.class)
+	ResponseEntity<ErroResponse> naoEncontrado(RecursoNaoEncontradoException ex, HttpServletRequest request) {
+		return resposta(HttpStatus.NOT_FOUND, ex.getMessage(), request);
+	}
+
 	@ExceptionHandler(ConflitoException.class)
 	ResponseEntity<ErroResponse> conflito(ConflitoException ex, HttpServletRequest request) {
 		HttpStatus status = HttpStatus.CONFLICT;

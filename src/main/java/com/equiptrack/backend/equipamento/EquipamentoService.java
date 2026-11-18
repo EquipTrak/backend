@@ -5,6 +5,7 @@ import com.equiptrack.backend.equipamento.dto.EquipamentoRequest;
 import com.equiptrack.backend.equipamento.dto.EquipamentoResponse;
 import com.equiptrack.backend.exception.CampoInvalidoException;
 import com.equiptrack.backend.exception.ConflitoException;
+import com.equiptrack.backend.historico.HistoricoService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,10 +17,13 @@ public class EquipamentoService {
 
 	private final EquipamentoRepository equipamentoRepository;
 	private final CategoriaRepository categoriaRepository;
+	private final HistoricoService historicoService;
 
-	public EquipamentoService(EquipamentoRepository equipamentoRepository, CategoriaRepository categoriaRepository) {
+	public EquipamentoService(EquipamentoRepository equipamentoRepository, CategoriaRepository categoriaRepository,
+			HistoricoService historicoService) {
 		this.equipamentoRepository = equipamentoRepository;
 		this.categoriaRepository = categoriaRepository;
+		this.historicoService = historicoService;
 	}
 
 	@Transactional(readOnly = true)
@@ -36,7 +40,7 @@ public class EquipamentoService {
 	}
 
 	@Transactional
-	public EquipamentoResponse cadastrar(EquipamentoRequest request) {
+	public EquipamentoResponse cadastrar(EquipamentoRequest request, Long usuarioId) {
 		String patrimonio = request.patrimonio().trim().toUpperCase(Locale.ROOT);
 		if (equipamentoRepository.existsByPatrimonioIgnoreCase(patrimonio)) {
 			throw new ConflitoException("patrimonio", "Este patrimônio já está cadastrado.");
@@ -62,7 +66,9 @@ public class EquipamentoService {
 		equipamento.setCondicao(request.condicao());
 		equipamento.setSituacao(situacao);
 		equipamento.setPrazoMaxHoras(request.prazoMaxHoras());
-		return EquipamentoResponse.de(equipamentoRepository.save(equipamento));
+		equipamento = equipamentoRepository.save(equipamento);
+		historicoService.registrarCadastro(equipamento, usuarioId);
+		return EquipamentoResponse.de(equipamento);
 	}
 
 	private static String textoOpcional(String valor) {

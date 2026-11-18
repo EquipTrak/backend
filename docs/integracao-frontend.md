@@ -14,7 +14,7 @@ Este documento acompanha a ligação entre o front (`EquipTrak/frontend`) e esta
 | Parte | Escopo | Situação |
 |---|---|---|
 | 1 | Login, sessão, logout e perfil do usuário | Feita |
-| 2 | Categorias e equipamentos, por tela do front | Em andamento (2a feita) |
+| 2 | Equipamentos, por tela do front: 2a lista e cadastro, 2b histórico | Feita |
 | 3 | Solicitações: criar, listar, aprovar, rejeitar e cancelar | Pendente |
 | 4 | Empréstimos: retirada, devolução, atraso e histórico do equipamento | Pendente |
 | 5 | Indicadores do painel, histórico por solicitante e bloqueio por atraso | Pendente |
@@ -77,7 +77,45 @@ No front:
 - Os erros por campo da API (400 e 409) aparecem embaixo de cada campo do modal.
 - No perfil `dev`, o backend cria as categorias e os seis equipamentos que o front tinha fixos (`CatalogoDevInitializer`). O `NB-0002` nasce `EMPRESTADO` só para a demonstração; ainda não existe empréstimo ligado a ele.
 
-Ainda locais no front: solicitações, retirada, devolução, histórico do equipamento (o cadastro adiciona o evento só na tela) e a edição de equipamento (RF05), que não tem tela no front.
+A edição de equipamento (RF05) ainda não tem tela no front e ficou fora.
+
+### Parte 2b: gaveta de histórico do equipamento
+
+| Tela ou ação do front | Endpoint | Quem pode |
+|---|---|---|
+| Gaveta "Histórico do equipamento" | `GET /api/equipamentos/{patrimonio}/historico` | `OPERADOR`, `ENCARREGADO` e `ADMINISTRADOR` |
+
+- A resposta traz os eventos do mais recente para o mais antigo:
+
+  ```json
+  [
+    {
+      "id": 7,
+      "dataHora": "2026-11-14T15:30:00Z",
+      "tipo": "CADASTRO",
+      "usuario": { "id": 2, "nome": "Marina Souza" },
+      "situacaoAnterior": null,
+      "situacaoNova": "DISPONIVEL",
+      "condicaoAnterior": null,
+      "condicaoNova": "OTIMA",
+      "observacao": "Situação inicial definida.",
+      "emprestimoId": null
+    }
+  ]
+  ```
+
+- `tipo` usa os valores do DER: `CADASTRO`, `RETIRADA`, `DEVOLUCAO`, `MUDANCA_CONDICAO`, `MUDANCA_SITUACAO`, `MANUTENCAO` e `CORRECAO`.
+- O patrimônio é procurado sem diferenciar maiúsculas. Patrimônio inexistente responde 404; perfil `SOLICITANTE` responde 403; equipamento sem eventos devolve `[]`.
+- Os eventos são gravados pelo próprio backend, na mesma transação da ação (RN11), e nunca são alterados nem apagados (RN12). Por enquanto só o cadastro (`POST /api/equipamentos`) gera evento; retirada, devolução e os demais entram com as partes 3 e 4.
+- `emprestimoId` fica nulo até existir a tabela de empréstimos (parte 4), quando a coluna vira chave estrangeira.
+- No perfil `dev`, os equipamentos de demonstração ganham o evento de cadastro em nome de Marina Souza, se `EQUIPTRACK_DEV_SENHA` estiver definida.
+
+No front:
+
+- A gaveta busca o histórico ao abrir, com estados de carregando e de erro ("Tentar novamente").
+- O front traduz `tipo` para o texto exibido e escolhe o selo (divergência 9, resolvida) e formata `dataHora` no fuso do navegador (divergência 6, para o histórico).
+- O solicitante não abre a gaveta: a busca rápida ignora o clique em equipamento para esse perfil.
+- Saiu o histórico fixo de demonstração. Os eventos das ações que ainda são locais (solicitações, retirada e devolução) continuam aparecendo no topo da gaveta até recarregar a página.
 
 ## Contrato das próximas partes
 
@@ -95,7 +133,7 @@ Endpoints propostos a partir do que as telas do front já fazem com dados de dem
 | 3 | `rejeitarSolicitacao` | `POST /api/solicitacoes/{id}/rejeicao` com `{ motivo }` | RF09 |
 | 4 | `registrarRetirada` | `POST /api/solicitacoes/{id}/retirada` | RF10 |
 | 4 | `registrarDevolucao` | `POST /api/emprestimos/{id}/devolucao` com `{ condicao, observacao }` | RF11, RF12 |
-| 4 | Gaveta de histórico | `GET /api/equipamentos/{patrimonio}/historico` | RF15 |
+| 2b | Gaveta de histórico | `GET /api/equipamentos/{patrimonio}/historico` (feito) | RF15 |
 | 5 | Faixa de indicadores | `GET /api/painel/indicadores` | RF20 |
 
 ## Divergências entre front e DER
@@ -112,4 +150,4 @@ O front foi feito antes do DER final. Estas diferenças precisam de decisão ant
 | 6 | Datas | Texto em `dd/MM/yyyy HH:mm` | `DATETIME` | A API usa ISO-8601, e o front formata para exibir. |
 | 7 | Solicitante | Comparado pelo nome | `id_solicitante` | A API devolve `{ id, nome }`, e "minhas solicitações" é filtrada no backend. |
 | 8 | Prazo do equipamento | Não existe no formulário | `prazo_max_horas` obrigatório | Resolvida na parte 2a: o formulário tem o campo, com padrão de 24 horas. |
-| 9 | Histórico | Tipo em texto livre | `tipo_evento` com valores fixos | A API devolve o tipo fixo, e o front traduz para o texto exibido. |
+| 9 | Histórico | Tipo em texto livre | `tipo_evento` com valores fixos | Resolvida na parte 2b: a API devolve o tipo fixo, e o front traduz para o texto exibido. |
