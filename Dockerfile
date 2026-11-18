@@ -2,7 +2,7 @@
 # Dois estágios: o primeiro compila o jar com o Gradle; o segundo só carrega o jar num JRE enxuto.
 
 # ---- Estágio 1: compilar ----
-FROM eclipse-temurin:21-jdk-noble AS compilar
+FROM eclipse-temurin:25-jdk-noble AS compilar
 WORKDIR /app
 
 # O wrapper e os arquivos do Gradle vêm antes do código, para o Docker reaproveitar o download
@@ -16,7 +16,7 @@ COPY src ./src
 RUN ./gradlew --no-daemon bootJar -x test
 
 # ---- Estágio 2: executar ----
-FROM eclipse-temurin:21-jre-noble
+FROM eclipse-temurin:25-jre-noble
 WORKDIR /app
 
 # Usuário sem privilégios: o processo não precisa ser root.
