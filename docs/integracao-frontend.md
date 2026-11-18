@@ -29,7 +29,7 @@ Este documento acompanha a ligação entre o front (`EquipTrak/frontend`) e esta
 
 - A rota `/painel` só abre com sessão válida (`autenticadoGuard`).
 - O perfil e o nome exibidos vêm do backend. Saíram o seletor "Perfil (protótipo)", a senha fixa `demo123` e o perfil na URL (`?perfil=`).
-- O perfil `SOLICITANTE` vê as telas de solicitante. Os demais (`OPERADOR`, `ADMINISTRADOR` e `ENCARREGADO`) veem as de operador, até a equipe definir telas próprias.
+- O perfil `SOLICITANTE` vê as telas de solicitante. Os demais (`OPERADOR` e `ADMINISTRADOR`) veem as de operador, até a equipe definir telas próprias.
 - Para testar, o perfil `dev` do backend cria usuários de demonstração (lista no [README](../README.md)).
 
 ### Parte 2a: tela de Equipamentos do operador
@@ -40,7 +40,7 @@ A parte 2 é entregue uma tela por vez. Esta primeira cobre a aba "Painel" do op
 |---|---|---|
 | Chips de categoria e select do modal | `GET /api/categorias` | Qualquer usuário logado |
 | Lista de equipamentos, indicadores e aba Disponíveis | `GET /api/equipamentos?situacao=&categoriaId=&busca=` | Qualquer usuário logado |
-| Botão "Salvar equipamento" | `POST /api/equipamentos` | `OPERADOR`, `ENCARREGADO` e `ADMINISTRADOR` |
+| Botão "Salvar equipamento" | `POST /api/equipamentos` | `OPERADOR` e `ADMINISTRADOR` |
 
 - `GET /api/categorias` devolve só as categorias ativas, em ordem alfabética: `[{ "id": 1, "nome": "Adaptador" }]`.
 - `GET /api/equipamentos` devolve só os equipamentos ativos, em ordem de patrimônio. Os filtros são opcionais e se combinam; `busca` procura no patrimônio e na descrição, sem diferenciar maiúsculas. Uma situação fora do DER (como `INDISPONIVEL`) responde 400.
@@ -83,7 +83,7 @@ A edição de equipamento (RF05) ainda não tem tela no front e ficou fora.
 
 | Tela ou ação do front | Endpoint | Quem pode |
 |---|---|---|
-| Gaveta "Histórico do equipamento" | `GET /api/equipamentos/{patrimonio}/historico` | `OPERADOR`, `ENCARREGADO` e `ADMINISTRADOR` |
+| Gaveta "Histórico do equipamento" | `GET /api/equipamentos/{patrimonio}/historico` | `OPERADOR` e `ADMINISTRADOR` |
 
 - A resposta traz os eventos do mais recente para o mais antigo:
 
@@ -202,7 +202,7 @@ No front:
 
 | Tela ou ação do front | Endpoint | Quem pode |
 |---|---|---|
-| Abas "Pendentes" e "Aprovadas" da fila | `GET /api/solicitacoes?status=` | `OPERADOR`, `ENCARREGADO` e `ADMINISTRADOR` |
+| Abas "Pendentes" e "Aprovadas" da fila | `GET /api/solicitacoes?status=` | `OPERADOR` e `ADMINISTRADOR` |
 | Botão "Aprovar" | `POST /api/solicitacoes/{id}/aprovacao` | os mesmos |
 | Modal "Rejeitar solicitação" | `POST /api/solicitacoes/{id}/rejeicao` com `{ "motivo": "..." }` | os mesmos |
 
@@ -237,7 +237,7 @@ No front:
 
 | Tela ou ação do front | Endpoint | Quem pode |
 |---|---|---|
-| Modal "Registrar retirada", botão "Confirmar retirada" | `POST /api/solicitacoes/{id}/retirada` | `OPERADOR`, `ENCARREGADO` e `ADMINISTRADOR` |
+| Modal "Registrar retirada", botão "Confirmar retirada" | `POST /api/solicitacoes/{id}/retirada` | `OPERADOR` e `ADMINISTRADOR` |
 
 - Não tem corpo. A resposta é 201, com o cabeçalho `Location` e a solicitação no formato das listas, agora com o empréstimo:
 
@@ -285,7 +285,7 @@ No front:
 
 | Tela ou ação do front | Endpoint | Quem pode |
 |---|---|---|
-| Modal "Registrar devolução", botão "Confirmar devolução" | `POST /api/emprestimos/{id}/devolucao` | `OPERADOR`, `ENCARREGADO` e `ADMINISTRADOR` |
+| Modal "Registrar devolução", botão "Confirmar devolução" | `POST /api/emprestimos/{id}/devolucao` | `OPERADOR` e `ADMINISTRADOR` |
 
 - `{id}` é o id do empréstimo (`emprestimo.id` nas listas de solicitações). Corpo:
 
@@ -342,7 +342,7 @@ No front:
 
 | Tela ou ação do front | Endpoint | Quem pode |
 |---|---|---|
-| Faixa "Disponíveis / Emprestados / Atrasados / Indisponíveis" do operador | `GET /api/painel/indicadores` | `OPERADOR`, `ENCARREGADO` e `ADMINISTRADOR` |
+| Faixa "Disponíveis / Emprestados / Atrasados / Indisponíveis" do operador | `GET /api/painel/indicadores` | `OPERADOR` e `ADMINISTRADOR` |
 
 - Resposta:
 
@@ -361,7 +361,7 @@ No front:
 
 ## Gestão de usuários pelos desenvolvedores
 
-O sistema é de uso interno e não tem tela de cadastro de usuários: todo usuário além dos de demonstração é criado pelos desenvolvedores, direto na API, com o seu perfil (`SOLICITANTE`, `OPERADOR`, `ENCARREGADO` ou `ADMINISTRADOR`).
+O sistema é de uso interno e não tem tela de cadastro de usuários: todo usuário além dos de demonstração é criado pelos desenvolvedores, direto na API, com o seu perfil (`SOLICITANTE`, `OPERADOR` ou `ADMINISTRADOR`).
 
 Acesso:
 
