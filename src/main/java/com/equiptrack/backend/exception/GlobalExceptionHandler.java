@@ -3,6 +3,7 @@ package com.equiptrack.backend.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -43,6 +44,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 			.body(ErroResponse.de(status, ex.getMessage(), request.getRequestURI()));
 	}
 
+	@ExceptionHandler(CampoInvalidoException.class)
+	ResponseEntity<ErroResponse> campoInvalido(CampoInvalidoException ex, HttpServletRequest request) {
+		HttpStatus status = HttpStatus.BAD_REQUEST;
+		return ResponseEntity.status(status).body(ErroResponse.de(status, "Dados inválidos.", request.getRequestURI(),
+				Map.of(ex.getCampo(), ex.getMessage())));
+	}
+
+	@ExceptionHandler(ConflitoException.class)
+	ResponseEntity<ErroResponse> conflito(ConflitoException ex, HttpServletRequest request) {
+		HttpStatus status = HttpStatus.CONFLICT;
+		return ResponseEntity.status(status).body(ErroResponse.de(status, ex.getMessage(), request.getRequestURI(),
+				Map.of(ex.getCampo(), ex.getMessage())));
+	}
+
 	@ExceptionHandler(AccessDeniedException.class)
 	ResponseEntity<ErroResponse> acessoNegado(AccessDeniedException ex, HttpServletRequest request) {
 		return resposta(HttpStatus.FORBIDDEN, "Você não tem permissão para esta ação.", request);
@@ -69,6 +84,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex,
 			HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 		ErroResponse corpo = ErroResponse.de(status, "O corpo da requisição é inválido.", caminho(request));
+		return ResponseEntity.status(status).headers(headers).body(corpo);
+	}
+
+	@Override
+	protected ResponseEntity<Object> handleTypeMismatch(TypeMismatchException ex, HttpHeaders headers,
+			HttpStatusCode status, WebRequest request) {
+		String campo = ex.getPropertyName() != null ? ex.getPropertyName() : "parametro";
+		ErroResponse corpo = ErroResponse.de(status, "Dados inválidos.", caminho(request),
+				Map.of(campo, "Valor inválido: " + ex.getValue()));
 		return ResponseEntity.status(status).headers(headers).body(corpo);
 	}
 
