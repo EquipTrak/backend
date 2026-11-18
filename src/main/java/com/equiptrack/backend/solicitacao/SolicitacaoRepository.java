@@ -12,6 +12,12 @@ public interface SolicitacaoRepository extends JpaRepository<SolicitacaoEmpresti
 	boolean existsBySolicitanteIdAndEquipamentoIdAndStatus(Long solicitanteId, Long equipamentoId,
 			StatusSolicitacao status);
 
+	/** Solicitações feitas pelo usuário (como solicitante) ou decididas por ele (como operador). */
+	@Query("""
+			select count(s) > 0 from SolicitacaoEmprestimo s
+			where s.solicitante.usuario.id = :usuarioId or s.operadorDecisao.id = :usuarioId""")
+	boolean existeRegistroDoUsuario(@Param("usuarioId") Long usuarioId);
+
 	/** Solicitações do usuário, da mais recente para a mais antiga. */
 	@Query("""
 			select s from SolicitacaoEmprestimo s

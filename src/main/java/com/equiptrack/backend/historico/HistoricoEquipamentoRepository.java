@@ -15,4 +15,6 @@ public interface HistoricoEquipamentoRepository extends JpaRepository<HistoricoE
 			order by h.dataHora desc, h.id desc""")
 	List<HistoricoEquipamento> buscarPorEquipamento(@Param("equipamentoId") Long equipamentoId);
 
+	boolean existsByUsuarioId(Long usuarioId);
+
 }

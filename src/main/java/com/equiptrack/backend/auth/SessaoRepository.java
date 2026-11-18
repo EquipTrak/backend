@@ -28,6 +28,10 @@ public interface SessaoRepository extends JpaRepository<Sessao, Long> {
 	void revogarTodas(@Param("usuarioId") Long usuarioId, @Param("agora") Instant agora);
 
 	@Modifying
+	@Query("delete from Sessao s where s.usuario.id = :usuarioId")
+	void removerTodas(@Param("usuarioId") Long usuarioId);
+
+	@Modifying
 	@Query("delete from Sessao s where s.usuario.id = :usuarioId and s.expiraEm <= :agora")
 	void removerExpiradas(@Param("usuarioId") Long usuarioId, @Param("agora") Instant agora);
 
