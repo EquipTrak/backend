@@ -1,0 +1,10 @@
+# Modelo da configuração local do MySQL. Copie para application-mysql.properties (mesma pasta) e preencha.
+# O Spring Boot lê config/application-mysql.properties sozinho quando o perfil "mysql" está ativo,
+# então não é preciso variável de ambiente nem IDE. O arquivo copiado não vai para o Git.
+
+spring.datasource.url=jdbc:mysql://localhost:3306/equiptrack?createDatabaseIfNotExist=true
+spring.datasource.username=root
+spring.datasource.password=senha-do-mysql
+
+# Chave dos desenvolvedores para a gestão de usuários (/api/usuarios).
+equiptrack.desenvolvedor.chave=uma-chave-longa-e-secreta

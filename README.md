@@ -20,11 +20,24 @@ Com Docker, usando o PostgreSQL do `compose.yaml`:
 ./gradlew bootRun
 ```
 
-Com um MySQL já instalado, sem Docker:
+Com um MySQL já instalado, sem Docker, usando o perfil `mysql`. A senha do banco e a chave dos desenvolvedores ficam em um arquivo local, que não vai para o Git:
+
+1. Copie `config/application-mysql.properties.example` para `config/application-mysql.properties` e preencha a senha do MySQL e a chave.
+2. Rode, sem variáveis de ambiente (o Spring Boot lê a pasta `config/` sozinho):
 
 ```bash
-SPRING_PROFILES_ACTIVE=mysql DB_USUARIO=root DB_SENHA=sua-senha ./gradlew bootRun
+SPRING_PROFILES_ACTIVE=mysql ./gradlew bootRun
 ```
+
+No PowerShell: `$env:SPRING_PROFILES_ACTIVE='mysql'; .\gradlew.bat bootRun`.
+
+O banco `equiptrack` é criado se não existir, e o Hibernate cria as tabelas. Sem o perfil `dev`, ele começa **sem usuários, equipamentos nem categorias**, e os dados ficam guardados entre as execuções. O primeiro usuário é criado pela API de gestão, com a chave de desenvolvedor (ver [Integração com o front-end](docs/integracao-frontend.md#gestão-de-usuários-pelos-desenvolvedores)):
+
+```bash
+curl -X POST http://localhost:8080/api/usuarios -H "X-Chave-Desenvolvedor: SUA-CHAVE" -H "Content-Type: application/json" -d '{"nome":"Administrador","email":"admin@equiptrack.local","senha":"uma-senha-forte","perfil":"ADMINISTRADOR"}'
+```
+
+Também dá para passar as configurações por variável de ambiente: `DB_URL`, `DB_USUARIO`, `DB_SENHA` e `EQUIPTRACK_CHAVE_DESENVOLVEDOR`.
 
 Para criar usuários de demonstração em desenvolvimento, adicione o perfil `dev` e defina a senha deles:
 
