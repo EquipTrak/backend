@@ -1,29 +1,212 @@
-# EquipTrack Backend
+# EquipTrack
 
-API REST do EquipTrack em Java 21 e Spring Boot 4.
+Sistema de empréstimo e rastreabilidade de equipamentos compartilhados (notebooks, projetores, câmeras, kits). O solicitante pede um equipamento por um período; o operador aprova, registra a retirada e a devolução; o sistema controla atrasos, bloqueios e o histórico de cada equipamento.
 
-Não é preciso instalar o JDK 21 para compilar: o Gradle baixa essa versão se ela não estiver na máquina. Basta ter um JDK recente para rodar o próprio Gradle.
+Este repositório é o **backend** (API REST) e também o dono do `compose.yaml` que sobe o sistema inteiro em contêineres. O front-end fica em outro repositório.
 
-## Testes
+| Parte | Repositório | Tecnologia |
+|---|---|---|
+| Backend (este) | [`EquipTrak/backend`](https://github.com/EquipTrak/backend) | Java 21, Spring Boot 4, Spring Security, JPA/Hibernate, Flyway |
+| Front-end | [`EquipTrak/frontend`](https://github.com/EquipTrak/frontend) | Angular 22, TypeScript, Tailwind |
+| Banco | — | MySQL 8.4 (produção e Docker); H2 nos testes; PostgreSQL só no `bootRun` de desenvolvimento |
+
+```
+navegador ──► frontend (nginx :4200) ──/api──► backend (Spring :8080) ──► MySQL (:3306)
+              só esta porta fica aberta         rede interna do compose      volume mysql-dados
+```
+
+## Início rápido com Docker
+
+É o caminho recomendado. Não precisa instalar Java, Node nem MySQL: só o Docker.
+
+### 1. Pré-requisitos
+
+- Docker Desktop (Windows ou macOS) ou Docker Engine (Linux), com o Compose v2.
+- Git.
+- As portas **4200** (front), **8080** (backend) e **3307** (MySQL) livres, ou outras definidas no `.env` (passo 3).
+
+> Este procedimento foi validado em **Windows 11 com Docker Desktop 29**. Linux e macOS usam os mesmos arquivos, mas **não foram testados**.
+
+Confira a instalação:
+
+```bash
+docker --version
+docker compose version
+```
+
+### 2. Clonar os dois repositórios, lado a lado
+
+O front é construído a partir de `../frontend`, então os dois ficam na mesma pasta:
+
+```bash
+mkdir equiptrack && cd equiptrack
+git clone https://github.com/EquipTrak/backend.git
+git clone https://github.com/EquipTrak/frontend.git
+cd backend
+```
+
+### 3. Configurar o `.env`
+
+```bash
+cp .env.example .env
+```
+
+No PowerShell ou no CMD: `copy .env.example .env`.
+
+Abra o `.env` e troque as três senhas e a chave por valores seus. O `.env` não vai para o Git. Todas as variáveis estão em [Variáveis de ambiente](#variáveis-de-ambiente).
+
+### 4. Subir
+
+```bash
+docker compose up --build -d
+```
+
+Na primeira vez demora, porque baixa as imagens e compila o backend e o front. A ordem de partida é garantida por health checks: o backend só inicia com o MySQL saudável e o front só inicia com o backend saudável.
+
+### 5. Verificar
+
+```bash
+docker compose ps
+```
+
+Os três serviços devem aparecer como `healthy`. Se algum não ficar, veja o log:
+
+```bash
+docker compose logs backend
+```
+
+O backend responde em `http://localhost:8080/actuator/health` (retorna `{"status":"UP",...}`). O banco começa **sem usuários**; as categorias de equipamento (Notebook, Projetor, Câmera, Adaptador, Kit) já vêm criadas pelas migrations.
+
+### 6. Criar o primeiro usuário
+
+Ainda não dá para entrar: o primeiro usuário é criado pela API de gestão, com a chave `EQUIPTRACK_CHAVE_DESENVOLVEDOR` do seu `.env`.
+
+No Git Bash, Linux ou macOS:
+
+```bash
+curl -X POST http://localhost:8080/api/usuarios -H "X-Chave-Desenvolvedor: SUA-CHAVE" -H "Content-Type: application/json" -d '{"nome":"Administrador","email":"admin@equiptrack.local","senha":"uma-senha-forte","perfil":"ADMINISTRADOR"}'
+```
+
+No PowerShell:
+
+```powershell
+$corpo = @{ nome = 'Administrador'; email = 'admin@equiptrack.local'; senha = 'uma-senha-forte'; perfil = 'ADMINISTRADOR' } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/usuarios -Headers @{ 'X-Chave-Desenvolvedor' = 'SUA-CHAVE' } -ContentType 'application/json; charset=utf-8' -Body $corpo
+```
+
+Os perfis são `SOLICITANTE`, `OPERADOR` e `ADMINISTRADOR`. O solicitante exige também `"solicitante":{"tipo":"ALUNO","matricula":"..."}`. A senha tem de 8 a 72 caracteres. Detalhes em [Integração com o front-end](docs/integracao-frontend.md#gestão-de-usuários-pelos-desenvolvedores).
+
+### 7. Acessar
+
+Abra **http://localhost:4200** e entre com o usuário criado.
+
+### 8. Parar, reiniciar e limpar
+
+| Para | Comando |
+|---|---|
+| Parar, **mantendo os dados** | `docker compose down` |
+| Subir de novo | `docker compose up -d` |
+| Refazer o backend após mudar o código | `docker compose up -d --build backend` |
+| Ver o log de um serviço | `docker compose logs -f backend` |
+| ⚠️ Parar e **apagar o banco** | `docker compose down -v` |
+
+> ⚠️ **`down -v` apaga o volume `mysql-dados` e, com ele, todos os dados.** Não há como desfazer; faça um [backup](#backup-e-restauração) antes.
+
+## Variáveis de ambiente
+
+Definidas no `.env` (modelo em [`.env.example`](.env.example)):
+
+| Variável | Obrigatória | Padrão | Para que serve |
+|---|---|---|---|
+| `MYSQL_ROOT_PASSWORD` | sim | — | Senha do `root` do MySQL do contêiner |
+| `DB_SENHA` | sim | — | Senha do usuário `equiptrack`, usado pelo backend |
+| `EQUIPTRACK_CHAVE_DESENVOLVEDOR` | sim | — | Chave da gestão de usuários (`/api/usuarios`). **Mínimo de 16 caracteres**, senão o backend não sobe |
+| `FUSO_HORARIO` | não | `America/Sao_Paulo` | Fuso que decide em que dia vence um empréstimo |
+| `FRONTEND_PORT` | não | `4200` | Porta do front no seu computador |
+| `BACKEND_PORT` | não | `8080` | Porta do backend (só em `127.0.0.1`) |
+| `MYSQL_PORT` | não | `3307` | Porta do MySQL (só em `127.0.0.1`) |
+| `FRONTEND_CONTEXT` | não | `../frontend` | Pasta do repositório do front |
+| `SWAGGER_ATIVO` | não | `false` | `true` liga o Swagger UI em `/swagger-ui.html` (ver [API](#api)) |
+
+Fora do compose, o backend também lê `DB_URL`, `DB_USUARIO`, `DB_SENHA`, `CORS_ORIGENS` (padrão `http://localhost:4200`; não é necessário com o front atrás do nginx, que mantém a mesma origem) e `FORWARD_HEADERS_STRATEGY` (veja [Rede e segurança](#rede-e-segurança)).
+
+## Banco de dados
+
+O MySQL guarda os dados no volume `mysql-dados`, que **sobrevive** a `docker compose down` e à recriação dos contêineres.
+
+### Migrations (Flyway)
+
+O schema é versionado em [`src/main/resources/db/migration`](src/main/resources/db/migration) e aplicado sozinho quando o backend sobe com o perfil `mysql` (o do Docker). O Hibernate só **valida** (`ddl-auto=validate`) se as entidades batem com o banco.
+
+- `V1__schema_inicial.sql`: as tabelas.
+- `V2__categorias_iniciais.sql`: as cinco categorias; cada uma só entra se ainda não existir.
+
+Um banco criado por versões anteriores (quando o Hibernate criava as tabelas) é reconhecido como a versão 1 e recebe só as migrations seguintes; nenhum dado é alterado. Para mudar o schema, crie `V3__descricao.sql`: nunca edite uma migration já publicada.
+
+```bash
+docker compose exec mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" equiptrack -e "select version, description, success from flyway_schema_history"'
+```
+
+### Conectar com um cliente (Workbench, DBeaver)
+
+`127.0.0.1`, porta `3307` (ou `MYSQL_PORT`), usuário `equiptrack`, senha `DB_SENHA`, banco `equiptrack`.
+
+### Backup e restauração
+
+Backup (cria `backup.sql` na pasta atual):
+
+```bash
+docker compose exec -T mysql sh -c 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" --single-transaction --routines equiptrack' > backup.sql
+```
+
+Restauração. ⚠️ Sobrescreve o conteúdo do banco `equiptrack`; para só conferir o backup, restaure em outro banco criado à parte:
+
+```bash
+docker compose exec -T mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" equiptrack' < backup.sql
+```
+
+### Atualização do MySQL
+
+O compose usa `mysql:8.4`. Um volume criado pelo `mysql:8.0` é atualizado sozinho na primeira partida (testado de 8.0.46 para 8.4.13, com os dados preservados). Faça um backup antes, por segurança.
+
+## Rede e segurança
+
+- **Só o front (4200) fica aberto à rede.** O MySQL e o backend escutam apenas em `127.0.0.1`; entre si falam pela rede interna do compose.
+- O navegador sempre chama `/api` no próprio front (mesma origem); o nginx repassa ao backend. Por isso não há CORS no uso normal.
+- `FORWARD_HEADERS_STRATEGY=framework` (já definido no compose) faz o bloqueio de tentativas de login enxergar o IP de quem chamou, que o nginx envia no `X-Forwarded-For`. **Só ligue isso com o backend fora do alcance direto da rede**, senão qualquer um poderia forjar o cabeçalho. No Docker Desktop (Windows e macOS), o IP visto é o do gateway do Docker, não o do cliente.
+- Backend e front rodam sem root; o backend com sistema de arquivos somente leitura e sem capabilities.
+- Swagger e os endpoints do Actuator ficam fechados; só `/actuator/health` é público, sem detalhes.
+- Não há HTTPS neste compose. Em produção, ponha um proxy com TLS à frente do front.
+
+## Logs
+
+```bash
+docker compose logs -f backend      # um serviço, acompanhando
+docker compose logs --tail 100      # os três, últimas 100 linhas
+```
+
+O backend registra um aviso quando a chave de desenvolvedor é recusada.
+
+## Executar sem Docker
+
+Os testes usam H2 em memória e não precisam de Docker nem de banco instalado:
 
 ```bash
 ./gradlew test
 ```
 
-Os testes usam H2 em memória e não precisam de Docker nem de banco instalado.
+Não é preciso instalar o JDK 21: o Gradle baixa essa versão. Basta um JDK recente para rodar o próprio Gradle.
 
-## Executar
-
-Só o banco em Docker, com o backend rodando pelo Gradle: o `./gradlew bootRun` sobe sozinho o PostgreSQL do `compose.yaml`. Para rodar **tudo** em contêineres, com MySQL, veja [Rodar tudo com Docker](#rodar-tudo-com-docker-mysql--backend--front).
+**Backend pelo Gradle, com PostgreSQL descartável em Docker.** O `./gradlew bootRun` sobe sozinho o `compose.dev-postgres.yaml` (porta aleatória, só em `127.0.0.1`):
 
 ```bash
 ./gradlew bootRun
 ```
 
-Com um MySQL já instalado, sem Docker, usando o perfil `mysql`. A senha do banco e a chave dos desenvolvedores ficam em um arquivo local, que não vai para o Git:
+**Com um MySQL já instalado**, pelo perfil `mysql`. A senha e a chave ficam em um arquivo local que não vai para o Git:
 
-1. Copie `config/application-mysql.properties.example` para `config/application-mysql.properties` e preencha a senha do MySQL e a chave.
-2. Rode, sem variáveis de ambiente (o Spring Boot lê a pasta `config/` sozinho):
+1. Copie `config/application-mysql.properties.example` para `config/application-mysql.properties` e preencha a senha do MySQL e a chave (mínimo de 16 caracteres).
+2. Rode (o Spring Boot lê a pasta `config/` sozinho):
 
 ```bash
 SPRING_PROFILES_ACTIVE=mysql ./gradlew bootRun
@@ -31,21 +214,13 @@ SPRING_PROFILES_ACTIVE=mysql ./gradlew bootRun
 
 No PowerShell: `$env:SPRING_PROFILES_ACTIVE='mysql'; .\gradlew.bat bootRun`.
 
-O banco `equiptrack` é criado se não existir, e o Hibernate cria as tabelas. Sem o perfil `dev`, ele começa **sem usuários, equipamentos nem categorias**, e os dados ficam guardados entre as execuções. O primeiro usuário é criado pela API de gestão, com a chave de desenvolvedor (ver [Integração com o front-end](docs/integracao-frontend.md#gestão-de-usuários-pelos-desenvolvedores)):
+O banco `equiptrack` é criado se não existir e o Flyway aplica as migrations. Sem o perfil `dev`, ele começa sem usuários.
 
-```bash
-curl -X POST http://localhost:8080/api/usuarios -H "X-Chave-Desenvolvedor: SUA-CHAVE" -H "Content-Type: application/json" -d '{"nome":"Administrador","email":"admin@equiptrack.local","senha":"uma-senha-forte","perfil":"ADMINISTRADOR"}'
-```
-
-Também dá para passar as configurações por variável de ambiente: `DB_URL`, `DB_USUARIO`, `DB_SENHA` e `EQUIPTRACK_CHAVE_DESENVOLVEDOR`.
-
-Para criar usuários de demonstração em desenvolvimento, adicione o perfil `dev` e defina a senha deles:
+**Dados de demonstração** (só em desenvolvimento): adicione o perfil `dev` e defina a senha deles:
 
 ```bash
 SPRING_PROFILES_ACTIVE=mysql,dev EQUIPTRACK_DEV_SENHA=sua-senha ./gradlew bootRun
 ```
-
-Todos usam a mesma senha:
 
 | E-mail | Perfil |
 |---|---|
@@ -54,86 +229,50 @@ Todos usam a mesma senha:
 | `rafael.lima@equiptrack.local` | Solicitante |
 | `beatriz.alves@equiptrack.local` | Solicitante |
 
-Os dois solicitantes também ganham o cadastro de solicitante (matrículas `DEMO-0001` e `DEMO-0002`), necessário para criar solicitações. Beatriz Alves começa com o `NB-0002` em atraso, para testar a aba "Atrasados" e o bloqueio por atraso.
+Todos usam a mesma senha. Os dois solicitantes ganham o cadastro de solicitante (matrículas `DEMO-0001` e `DEMO-0002`). Beatriz Alves começa com o `NB-0002` em atraso, para testar a aba "Atrasados" e o bloqueio por atraso.
 
-## Rodar tudo com Docker (MySQL + backend + front)
+## Testes
 
-O `compose.mysql.yaml` sobe os três serviços juntos: o **MySQL 8**, o **backend** e o **front**. Não é preciso instalar Java, Node nem MySQL: só o Docker.
+```bash
+./gradlew test
+```
 
-Requisitos:
+Cobrem autenticação, regras de empréstimo, atraso, histórico, painel, gestão de usuários, exposição operacional (Swagger/Actuator) e a concorrência na devolução. Usam H2 em memória.
 
-- Docker Desktop (ou Docker Engine) com o Compose v2, o comando `docker compose`.
-- Os repositórios `backend` e `frontend` **lado a lado**, na mesma pasta (o `instalar-equiptrack.ps1` já deixa assim), pois o front é construído a partir de `../frontend`.
-- As portas **4200** (front), **8080** (backend) e **3307** (MySQL no seu computador) livres. Se você roda o backend ou o front fora do Docker, pare-os antes.
+## API
 
-Passo a passo, na pasta do backend:
+Os endpoints (resumo; o contrato completo está em [Integração com o front-end](docs/integracao-frontend.md) e [Autenticação](docs/autenticacao.md)):
 
-1. Crie o arquivo `.env` a partir do modelo e preencha as duas senhas e a chave. O `.env` não vai para o Git:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-   No CMD ou no PowerShell: `copy .env.example .env`.
-
-2. Suba tudo. Na primeira vez demora, porque baixa as imagens e compila o backend e o front:
-
-   ```bash
-   docker compose -f compose.mysql.yaml up --build
-   ```
-
-   O backend só inicia depois que o MySQL ficar saudável. Está pronto quando o log do backend mostra `Started BackendApplication`.
-
-3. Acesse `http://localhost:4200`. O banco começa **vazio**, sem usuários, equipamentos nem categorias, então ainda não dá para entrar.
-
-4. Crie o primeiro usuário pela API de gestão, com a chave do `.env` (`EQUIPTRACK_CHAVE_DESENVOLVEDOR`). No Git Bash:
-
-   ```bash
-   curl -X POST http://localhost:8080/api/usuarios -H "X-Chave-Desenvolvedor: SUA-CHAVE" -H "Content-Type: application/json" -d '{"nome":"Administrador","email":"admin@equiptrack.local","senha":"uma-senha-forte","perfil":"ADMINISTRADOR"}'
-   ```
-
-   O PowerShell e o CMD quebram as aspas do JSON no `curl`; use o Git Bash ou o `Invoke-RestMethod` do PowerShell. Os perfis são `SOLICITANTE`, `OPERADOR` e `ADMINISTRADOR`, e o solicitante exige também `"solicitante":{"tipo":"ALUNO","matricula":"..."}`. Os detalhes estão em [Integração com o front-end](docs/integracao-frontend.md#gestão-de-usuários-pelos-desenvolvedores).
-
-5. Crie ao menos uma categoria de equipamento, sem a qual não dá para cadastrar equipamentos (ainda não há API para categorias). Abra o MySQL do contêiner, digite a senha do root (`MYSQL_ROOT_PASSWORD`, do `.env`) e rode o SQL:
-
-   ```bash
-   docker compose -f compose.mysql.yaml exec mysql mysql -u root -p --default-character-set=utf8mb4 equiptrack
-   ```
-
-   ```sql
-   INSERT INTO categoria_equipamento (nome, descricao, ativa) VALUES
-   	('Notebook',  'Notebooks para aulas e atividades em campo', 1),
-   	('Projetor',  'Projetores multimídia', 1),
-   	('Câmera',    'Câmeras fotográficas e de vídeo', 1),
-   	('Adaptador', 'Adaptadores e cabos (HDMI, VGA, USB-C)', 1),
-   	('Kit',       'Kits de iluminação, tripés e acessórios', 1)
-   ON DUPLICATE KEY UPDATE descricao = VALUES(descricao), ativa = 1;
-   ```
-
-Comandos úteis, sempre com `-f compose.mysql.yaml`:
-
-| Para | Comando |
+| Método e rota | Quem acessa |
 |---|---|
-| Subir em segundo plano | `docker compose -f compose.mysql.yaml up -d --build` |
-| Ver o log de um serviço | `docker compose -f compose.mysql.yaml logs -f backend` |
-| Parar, mantendo os dados | `docker compose -f compose.mysql.yaml down` |
-| Parar e **apagar o banco** | `docker compose -f compose.mysql.yaml down -v` |
-| Refazer o backend após mudar o código | `docker compose -f compose.mysql.yaml up -d --build backend` |
+| `POST /api/auth/login`, `POST /api/auth/logout`, `POST /api/auth/logout-todas`, `GET /api/auth/me` | login público; os demais, qualquer usuário logado |
+| `GET /api/categorias`, `GET /api/equipamentos` | qualquer usuário logado |
+| `POST /api/equipamentos`, `GET /api/equipamentos/{patrimonio}/historico` | operador e administrador |
+| `POST /api/solicitacoes`, `GET /api/solicitacoes/minhas`, `POST /api/solicitacoes/{id}/cancelamento` | solicitante |
+| `GET /api/solicitacoes`, `POST /api/solicitacoes/{id}/aprovacao`, `.../rejeicao`, `.../retirada` | operador e administrador |
+| `POST /api/emprestimos/{id}/devolucao`, `GET /api/painel/indicadores` | operador e administrador |
+| `/api/usuarios` | só com a chave de desenvolvedor (`X-Chave-Desenvolvedor`) |
 
-Bom saber:
+**Swagger UI** fica desligado por padrão, porque descreve todas as rotas, inclusive as administrativas. Para ligar em um ambiente de teste, defina `SWAGGER_ATIVO=true` e abra `http://localhost:8080/swagger-ui.html`.
 
-- Os dados do MySQL ficam no volume `mysql-dados` e sobrevivem ao `down`. Só o `down -v` os apaga.
-- Para olhar o banco por fora do contêiner (MySQL Workbench, DBeaver), conecte em `127.0.0.1`, porta **3307**, usuário `equiptrack` e a senha `DB_SENHA` do `.env`.
-- O front roda em modo de desenvolvimento (`ng serve`) e repassa `/api` para o backend pela rede do compose, então o navegador não precisa de CORS. Serve para uso interno e testes; não é um build otimizado de produção.
-- O arquivo não se chama `compose.yaml` de propósito: o `compose.yaml` da pasta é o do PostgreSQL, que o Spring Boot sobe sozinho com `./gradlew bootRun`.
-- Os testes (`./gradlew test`) continuam usando H2 em memória e não dependem do Docker.
+## Solução de problemas
 
-## Front-end
-
-O front (repositório `EquipTrak/frontend`) chama esta API pelo prefixo `/api`. Com o backend na porta 8080, rode `npm start` no front e acesse `http://localhost:4200`.
+| Sintoma | O que fazer |
+|---|---|
+| `port is already allocated` / porta em uso | Outra coisa usa 4200, 8080 ou 3307 (por exemplo, o front ou o backend rodando fora do Docker). Pare-a ou mude `FRONTEND_PORT`, `BACKEND_PORT` ou `MYSQL_PORT` no `.env` e suba de novo. |
+| `Defina MYSQL_ROOT_PASSWORD no arquivo .env` | O `.env` não existe ou está sem essa variável. Refaça o passo 3. |
+| O backend reinicia ou não fica `healthy` | `docker compose logs backend`. Causas comuns: chave com menos de 16 caracteres; senha do `.env` diferente da usada quando o volume foi criado (veja "Volume com dados antigos"). |
+| O banco ainda não está pronto | O compose já espera o health check do MySQL. Se mesmo assim falhar, aguarde um minuto e rode `docker compose up -d` de novo. |
+| O front abre, mas as chamadas falham (502) | O backend não está de pé: `docker compose ps` e `docker compose logs backend`. |
+| Erro de migrations (`Validate failed`, `Schema-validation`) | O banco foi alterado fora do Flyway. Restaure um backup, ou use outro banco. Não apague o volume antes de guardar um backup. |
+| Falha de build do front | Confira se `../frontend` existe (ou defina `FRONTEND_CONTEXT`) e se o Docker tem acesso à internet para baixar as dependências. |
+| Permissão negada em volumes/arquivos | No Linux, rode o Docker com seu usuário no grupo `docker`. Os dados ficam em volume gerenciado pelo Docker, sem permissões a acertar. |
+| Volume com dados antigos / senha trocada no `.env` | O MySQL só lê `MYSQL_*` ao **criar** o volume. Para trocar a senha de um banco já criado, altere-a dentro do MySQL (`ALTER USER`). Só apague o volume (`down -v`) se puder perder os dados e depois de um backup. |
+| O front não alcança o backend (DNS entre contêineres) | Os dois precisam estar no mesmo compose; o front usa `API_URL=http://backend:8080`. Verifique com `docker compose ps` e use `docker compose up -d` (não suba o front isolado). |
+| Login retorna "Acesso desativado" ou 403 | Usuário desativado, ou acesso por um endereço diferente do usado na configuração. Acesse pelo front (`http://localhost:4200`), não pelo backend direto. |
 
 ## Documentação
 
 - [Autenticação](docs/autenticacao.md)
 - [Integração com o front-end](docs/integracao-frontend.md)
-- Swagger UI: `http://localhost:8080/swagger-ui.html`, com a aplicação rodando
+- [Auditoria técnica e plano de correções](docs/auditoria.md)
