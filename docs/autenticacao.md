@@ -97,8 +97,7 @@ As autoridades seguem o perfil: `ROLE_SOLICITANTE`, `ROLE_OPERADOR`, `ROLE_ADMIN
 | `equiptrack.auth.login.max-tentativas` | `5` | Falhas de login antes do bloqueio |
 | `equiptrack.auth.login.bloqueio` | `15m` | Janela de contagem e duração do bloqueio |
 | `CORS_ORIGENS` | `http://localhost:4200` | Origens do frontend, separadas por vírgula |
-| `EQUIPTRACK_ADMIN_SENHA` | vazio | Só no perfil `dev`: cria o primeiro administrador |
-| `EQUIPTRACK_ADMIN_EMAIL` | `admin@equiptrack.local` | Só no perfil `dev`: e-mail desse administrador |
+| `EQUIPTRACK_DEV_SENHA` | vazio | Só no perfil `dev`: cria os usuários de demonstração com essa senha (lista no README) |
 
 ## Testes
 
