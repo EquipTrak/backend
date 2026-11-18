@@ -4,6 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -24,6 +26,8 @@ public class ChaveDesenvolvedorFilter extends OncePerRequestFilter {
 	public static final String CABECALHO = "X-Chave-Desenvolvedor";
 	public static final String PAPEL = "DESENVOLVEDOR";
 
+	private static final Logger log = LoggerFactory.getLogger(ChaveDesenvolvedorFilter.class);
+
 	private final byte[] chave;
 
 	public ChaveDesenvolvedorFilter(String chave) {
@@ -40,6 +44,11 @@ public class ChaveDesenvolvedorFilter extends OncePerRequestFilter {
 			var autoridades = List.of(new SimpleGrantedAuthority("ROLE_" + PAPEL));
 			SecurityContextHolder.getContext()
 				.setAuthentication(new UsernamePasswordAuthenticationToken(PAPEL, null, autoridades));
+		}
+		else if (enviada != null) {
+			// Rastro de tentativa com chave errada (ou rota fechada por falta de chave configurada).
+			log.warn("Chave de desenvolvedor recusada em {} {} a partir de {}", request.getMethod(),
+					request.getRequestURI(), request.getRemoteAddr());
 		}
 		filterChain.doFilter(request, response);
 	}

@@ -106,7 +106,8 @@ public class EmprestimoService {
 	 */
 	@Transactional
 	public SolicitacaoResponse registrarDevolucao(Long emprestimoId, DevolucaoRequest request, Long operadorId) {
-		Emprestimo emprestimo = emprestimoRepository.buscarPorId(emprestimoId)
+		// A trava vem antes de ler o status: devoluções simultâneas do mesmo empréstimo rodam em fila.
+		Emprestimo emprestimo = emprestimoRepository.travarPorId(emprestimoId)
 			.orElseThrow(() -> new RecursoNaoEncontradoException("Empréstimo não encontrado."));
 		if (emprestimo.getStatus() == StatusEmprestimo.DEVOLVIDO) {
 			throw new ConflitoException("status", "A devolução deste empréstimo já foi registrada.");

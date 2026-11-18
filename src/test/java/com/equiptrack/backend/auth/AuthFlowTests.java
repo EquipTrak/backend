@@ -281,15 +281,6 @@ class AuthFlowTests {
 			.andExpect(status().isForbidden());
 	}
 
-	@Test
-	void documentacaoOpenApiEhPublicaEListaOsEndpoints() throws Exception {
-		mockMvc.perform(get("/v3/api-docs"))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.paths['/api/auth/login'].post").exists())
-			.andExpect(jsonPath("$.paths['/api/auth/logout'].post").exists())
-			.andExpect(jsonPath("$.paths['/api/auth/me'].get").exists());
-	}
-
 	private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder login(String email, String senha) {
 		return post("/api/auth/login")
 			.contentType(MediaType.APPLICATION_JSON)

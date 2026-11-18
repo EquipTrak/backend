@@ -1,9 +1,83 @@
+# EquipTrack completo em contêineres: MySQL + backend + front.
+#
+#   1. cp .env.example .env   (e preencha as senhas e a chave)
+#   2. docker compose up --build -d
+#   3. abra http://localhost:4200
+#
+# O front é construído a partir de ../frontend (os repositórios backend e frontend lado a lado); para usar
+# outra pasta, defina FRONTEND_CONTEXT no .env. Detalhes e solução de problemas: README.md.
+#
+# Rede: só o front (porta 4200) fica aberto à rede. MySQL e backend escutam apenas em 127.0.0.1 (para o seu
+# cliente de banco e para a API de gestão de usuários) e conversam entre si pela rede interna do compose.
+
 services:
-  postgres:
-    image: 'postgres:latest'
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
     environment:
-      - 'POSTGRES_DB=mydatabase'
-      - 'POSTGRES_PASSWORD=secret'
-      - 'POSTGRES_USER=myuser'
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Defina MYSQL_ROOT_PASSWORD no arquivo .env}
+      MYSQL_DATABASE: equiptrack
+      MYSQL_USER: equiptrack
+      MYSQL_PASSWORD: ${DB_SENHA:?Defina DB_SENHA no arquivo .env}
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_ai_ci
+    volumes:
+      # Os dados ficam neste volume e sobrevivem a "docker compose down". Só "down -v" os apaga.
+      - mysql-dados:/var/lib/mysql
     ports:
-      - '5432'
+      # 3307 no computador, para não bater com um MySQL instalado na porta 3306.
+      - "127.0.0.1:${MYSQL_PORT:-3307}:3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  backend:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: mysql
+      # allowPublicKeyRetrieval: o usuário do MySQL 8 usa caching_sha2_password; sem isso a primeira conexão
+      # pode ser recusada quando o TLS não é negociado. A rede é interna ao compose.
+      DB_URL: jdbc:mysql://mysql:3306/equiptrack?allowPublicKeyRetrieval=true
+      DB_USUARIO: equiptrack
+      DB_SENHA: ${DB_SENHA:?Defina DB_SENHA no arquivo .env}
+      EQUIPTRACK_CHAVE_DESENVOLVEDOR: ${EQUIPTRACK_CHAVE_DESENVOLVEDOR:?Defina EQUIPTRACK_CHAVE_DESENVOLVEDOR no arquivo .env}
+      FUSO_HORARIO: ${FUSO_HORARIO:-America/Sao_Paulo}
+      # O nginx do front sobrescreve o X-Forwarded-For com o IP de quem chamou; com isto o bloqueio de
+      # tentativas de login enxerga o IP real. Só é seguro porque a porta do backend fica presa ao 127.0.0.1.
+      FORWARD_HEADERS_STRATEGY: framework
+      SWAGGER_ATIVO: ${SWAGGER_ATIVO:-false}
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
+    # O processo não precisa de privilégios nem de escrever no sistema de arquivos (só em /tmp).
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  frontend:
+    build: ${FRONTEND_CONTEXT:-../frontend}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      # Dentro da rede do compose, o backend é alcançado pelo nome do serviço.
+      API_URL: http://backend:8080
+    ports:
+      - "${FRONTEND_PORT:-4200}:8080"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  mysql-dados:

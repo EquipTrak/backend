@@ -28,18 +28,28 @@ import java.util.List;
 		paramName = ChaveDesenvolvedorFilter.CABECALHO)
 public class SecurityConfig {
 
+	static final int TAMANHO_MINIMO_CHAVE = 16;
+
 	@Bean
 	SecurityFilterChain securityFilterChain(HttpSecurity http, AuthService authService,
 			ErroSegurancaHandler erroSegurancaHandler,
-			@Value("${equiptrack.desenvolvedor.chave}") String chaveDesenvolvedor) throws Exception {
+			@Value("${equiptrack.desenvolvedor.chave}") String chaveDesenvolvedor,
+			@Value("${springdoc.api-docs.enabled:false}") boolean documentacaoAtiva) throws Exception {
+		validarChaveDesenvolvedor(chaveDesenvolvedor);
 		return http
 			// A API não usa cookies: o token vai no cabeçalho Authorization, então não há superfície de CSRF.
 			.csrf(AbstractHttpConfigurer::disable)
 			.cors(Customizer.withDefaults())
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-			.authorizeHttpRequests(requests -> requests
+			.authorizeHttpRequests(requests -> {
+				// A documentação só é pública quando foi ligada de propósito (springdoc.api-docs.enabled).
+				if (documentacaoAtiva) {
+					requests.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll();
+				}
+				requests
 				.requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
-				.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+				// Health para o Docker e para o balanceador; sem detalhes (ver management.endpoint.health).
+				.requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
 				// Cadastro de equipamento (RF04): todo perfil que usa a visão do operador.
 				// Histórico do equipamento (RF15): mesma regra do cadastro.
 				.requestMatchers(HttpMethod.GET, "/api/equipamentos/*/historico")
@@ -67,13 +77,23 @@ public class SecurityConfig {
 					.hasAnyRole("OPERADOR", "ADMINISTRADOR")
 				// Gestão de usuários: só desenvolvedores, pela chave; nenhum perfil do sistema tem acesso.
 				.requestMatchers("/api/usuarios", "/api/usuarios/**").hasRole(ChaveDesenvolvedorFilter.PAPEL)
-				.anyRequest().authenticated())
+				.anyRequest().authenticated();
+			})
 			.exceptionHandling(exceptions -> exceptions
 				.authenticationEntryPoint(erroSegurancaHandler)
 				.accessDeniedHandler(erroSegurancaHandler))
 			.addFilterBefore(new TokenAuthenticationFilter(authService), UsernamePasswordAuthenticationFilter.class)
 			.addFilterAfter(new ChaveDesenvolvedorFilter(chaveDesenvolvedor), TokenAuthenticationFilter.class)
 			.build();
+	}
+
+	/** Chave curta é adivinhável: não deixa a aplicação subir. Vazia é permitido e fecha as rotas de usuários. */
+	static void validarChaveDesenvolvedor(String chave) {
+		if (chave != null && !chave.isBlank() && chave.length() < TAMANHO_MINIMO_CHAVE) {
+			throw new IllegalStateException(
+					"EQUIPTRACK_CHAVE_DESENVOLVEDOR deve ter pelo menos %d caracteres (ou ficar vazia, para fechar a gestão de usuários)."
+						.formatted(TAMANHO_MINIMO_CHAVE));
+		}
 	}
 
 	@Bean

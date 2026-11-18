@@ -1,6 +1,8 @@
 package com.equiptrack.backend.emprestimo;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -22,6 +24,15 @@ public interface EmprestimoRepository extends JpaRepository<Emprestimo, Long> {
 			join fetch e.solicitacao s join fetch s.solicitante so join fetch so.usuario join fetch s.equipamento
 			where e.id = :id""")
 	Optional<Emprestimo> buscarPorId(@Param("id") Long id);
+
+	/**
+	 * Busca o empréstimo travando a linha até o fim da transação. A devolução precisa disso: duas devoluções
+	 * simultâneas do mesmo empréstimo rodam uma depois da outra, e a segunda já enxerga o status DEVOLVIDO
+	 * gravado pela primeira (sem a trava, as duas passavam pela checagem de status).
+	 */
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select e from Emprestimo e where e.id = :id")
+	Optional<Emprestimo> travarPorId(@Param("id") Long id);
 
 	@Query("""
 			select count(e) > 0 from Emprestimo e
