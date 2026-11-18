@@ -16,7 +16,7 @@ Este documento acompanha a ligação entre o front (`EquipTrak/frontend`) e esta
 | 1 | Login, sessão, logout e perfil do usuário | Feita |
 | 2 | Equipamentos, por tela do front: 2a lista e cadastro, 2b histórico | Feita |
 | 3 | Solicitações, por tela do front: 3a criar, 3b minhas solicitações e cancelar, 3c fila do operador, aprovar e rejeitar | Feita |
-| 4 | Empréstimos, por tela do front: 4a retirada (feita); devolução e atraso | Em andamento |
+| 4 | Empréstimos, por tela do front: 4a retirada e 4b devolução (feitas); atraso | Em andamento |
 | 5 | Indicadores do painel, histórico por solicitante e bloqueio por atraso | Pendente |
 
 ### Parte 1: autenticação
@@ -106,7 +106,7 @@ A edição de equipamento (RF05) ainda não tem tela no front e ficou fora.
 
 - `tipo` usa os valores do DER: `CADASTRO`, `RETIRADA`, `DEVOLUCAO`, `MUDANCA_CONDICAO`, `MUDANCA_SITUACAO`, `MANUTENCAO` e `CORRECAO`.
 - O patrimônio é procurado sem diferenciar maiúsculas. Patrimônio inexistente responde 404; perfil `SOLICITANTE` responde 403; equipamento sem eventos devolve `[]`.
-- Os eventos são gravados pelo próprio backend, na mesma transação da ação (RN11), e nunca são alterados nem apagados (RN12). Hoje geram evento o cadastro (`POST /api/equipamentos`) e a retirada (parte 4a); a devolução entra na parte 4b.
+- Os eventos são gravados pelo próprio backend, na mesma transação da ação (RN11), e nunca são alterados nem apagados (RN12). Hoje geram evento o cadastro (`POST /api/equipamentos`), a retirada (parte 4a) e a devolução (parte 4b).
 - `emprestimoId` vem preenchido nos eventos ligados a um empréstimo, como a retirada. Desde a parte 4a, a coluna é chave estrangeira para `emprestimo`.
 - No perfil `dev`, os equipamentos de demonstração ganham o evento de cadastro em nome de Marina Souza, se `EQUIPTRACK_DEV_SENHA` estiver definida.
 
@@ -115,7 +115,7 @@ No front:
 - A gaveta busca o histórico ao abrir, com estados de carregando e de erro ("Tentar novamente").
 - O front traduz `tipo` para o texto exibido e escolhe o selo (divergência 9, resolvida) e formata `dataHora` no fuso do navegador (divergência 6, para o histórico).
 - O solicitante não abre a gaveta: a busca rápida ignora o clique em equipamento para esse perfil.
-- Saiu o histórico fixo de demonstração. Os eventos das ações que ainda são locais (solicitações, retirada e devolução) continuam aparecendo no topo da gaveta até recarregar a página.
+- Saiu o histórico fixo de demonstração. Desde a parte 4b, todos os eventos da gaveta vêm da API; o front não cria mais eventos locais.
 
 ### Parte 3a: botão "Solicitar" da tela Disponíveis
 
@@ -281,6 +281,40 @@ No front:
 - Saiu o evento local "Retirada registrada" da gaveta: o evento vem do backend.
 - O `NB-0002` do perfil `dev` continua nascendo `EMPRESTADO` sem empréstimo, só para a demonstração.
 
+### Parte 4b: botão "Registrar devolução" da fila do operador
+
+| Tela ou ação do front | Endpoint | Quem pode |
+|---|---|---|
+| Modal "Registrar devolução", botão "Confirmar devolução" | `POST /api/emprestimos/{id}/devolucao` | `OPERADOR`, `ENCARREGADO` e `ADMINISTRADOR` |
+
+- `{id}` é o id do empréstimo (`emprestimo.id` nas listas de solicitações). Corpo:
+
+  ```json
+  { "condicao": "COM_AVARIA", "observacao": "Lente trincada." }
+  ```
+
+- A resposta é 200, com a solicitação no formato das listas e `emprestimo.status: "DEVOLVIDO"`.
+- Na mesma transação (RN11), o backend:
+  - fecha o empréstimo (data, operador, condição e observação da devolução) e libera `ativo_flag`, para que o equipamento possa sair de novo (RN04);
+  - grava a condição no equipamento (RN05). Com `COM_AVARIA`, ele fica `DANIFICADO` até a avaliação (RF12, RN06); nos demais casos, volta a `DISPONIVEL`;
+  - grava um evento `DEVOLUCAO` no histórico, com situação e condição antes e depois e a observação.
+
+  | Regra | Resposta |
+  |---|---|
+  | `condicao` ausente ou fora do DER | 400 em `campos.condicao` |
+  | `observacao` com mais de 500 caracteres | 400 em `campos.observacao` |
+  | Empréstimo inexistente | 404 |
+  | Devolução já registrada | 409 |
+  | Perfil `SOLICITANTE` | 403 |
+
+- A devolução também vale para empréstimo atrasado. Multa e regularização do atraso ficam para a parte 4c.
+
+No front:
+
+- "Confirmar devolução" chama a API e mostra os erros no modal. O modal ganhou a condição `REGULAR`, e a observação tem limite de 500 caracteres.
+- A solicitação vai para `DEVOLVIDO`, e o equipamento muda de situação e condição na hora.
+- Saíram os eventos locais de devolução e o mapa de eventos locais do serviço: a gaveta mostra só o que vem da API.
+
 ## Contrato das próximas partes
 
 Endpoints propostos a partir do que as telas do front já fazem com dados de demonstração. Eles servem de ponto de partida e podem mudar na revisão de cada parte.
@@ -297,7 +331,7 @@ Endpoints propostos a partir do que as telas do front já fazem com dados de dem
 | 3c | `aprovarSolicitacao` | `POST /api/solicitacoes/{id}/aprovacao` (feito) | RF09, RN13 |
 | 3c | `rejeitarSolicitacao` | `POST /api/solicitacoes/{id}/rejeicao` com `{ motivo }` (feito) | RF09 |
 | 4a | `registrarRetirada` | `POST /api/solicitacoes/{id}/retirada` (feito) | RF10, RN02, RN04 |
-| 4 | `registrarDevolucao` | `POST /api/emprestimos/{id}/devolucao` com `{ condicao, observacao }` | RF11, RF12 |
+| 4b | `registrarDevolucao` | `POST /api/emprestimos/{id}/devolucao` com `{ condicao, observacao }` (feito) | RF11, RF12, RN05, RN06 |
 | 2b | Gaveta de histórico | `GET /api/equipamentos/{patrimonio}/historico` (feito) | RF15 |
 | 5 | Faixa de indicadores | `GET /api/painel/indicadores` | RF20 |
 

@@ -1,15 +1,18 @@
 package com.equiptrack.backend.emprestimo;
 
+import com.equiptrack.backend.emprestimo.dto.DevolucaoRequest;
 import com.equiptrack.backend.security.UsuarioAutenticado;
 import com.equiptrack.backend.solicitacao.dto.SolicitacaoResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -38,6 +41,19 @@ public class EmprestimoController {
 			@AuthenticationPrincipal UsuarioAutenticado usuario) {
 		SolicitacaoResponse resposta = emprestimoService.registrarRetirada(id, usuario.id());
 		return ResponseEntity.created(URI.create("/api/emprestimos/" + resposta.emprestimo().id())).body(resposta);
+	}
+
+	@PostMapping("/emprestimos/{id}/devolucao")
+	@Operation(summary = "Registra a devolução com a condição do equipamento (RF11, RF12)")
+	@ApiResponse(responseCode = "200", description = "Devolução registrada; o equipamento volta a DISPONIVEL ou fica DANIFICADO")
+	@ApiResponse(responseCode = "400", description = "Condição ausente ou inválida, ou observação longa demais")
+	@ApiResponse(responseCode = "401", description = "Token ausente, inválido, expirado ou revogado")
+	@ApiResponse(responseCode = "403", description = "Perfil sem permissão (solicitante)")
+	@ApiResponse(responseCode = "404", description = "Empréstimo inexistente")
+	@ApiResponse(responseCode = "409", description = "Devolução já registrada")
+	public SolicitacaoResponse registrarDevolucao(@PathVariable Long id, @Valid @RequestBody DevolucaoRequest request,
+			@AuthenticationPrincipal UsuarioAutenticado usuario) {
+		return emprestimoService.registrarDevolucao(id, request, usuario.id());
 	}
 
 }

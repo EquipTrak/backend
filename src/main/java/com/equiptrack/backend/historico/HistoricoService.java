@@ -1,6 +1,7 @@
 package com.equiptrack.backend.historico;
 
 import com.equiptrack.backend.emprestimo.Emprestimo;
+import com.equiptrack.backend.equipamento.Condicao;
 import com.equiptrack.backend.equipamento.Equipamento;
 import com.equiptrack.backend.equipamento.Situacao;
 import com.equiptrack.backend.equipamento.EquipamentoRepository;
@@ -53,6 +54,26 @@ public class HistoricoService {
 		evento.setTipo(TipoEvento.RETIRADA);
 		evento.setSituacaoAnterior(situacaoAnterior);
 		evento.setSituacaoNova(equipamento.getSituacao());
+		evento.setObservacao(observacao);
+		historicoRepository.save(evento);
+	}
+
+	/**
+	 * Registra a devolução (RN11) num só evento, com a situação e a condição antes e depois. Sem observação do
+	 * operador, a observação diz a condição de chegada.
+	 */
+	@Transactional
+	public void registrarDevolucao(Equipamento equipamento, Emprestimo emprestimo, Situacao situacaoAnterior,
+			Condicao condicaoAnterior, Long usuarioId, String observacao) {
+		HistoricoEquipamento evento = new HistoricoEquipamento();
+		evento.setEquipamento(equipamento);
+		evento.setEmprestimo(emprestimo);
+		evento.setUsuario(usuarioRepository.getReferenceById(usuarioId));
+		evento.setTipo(TipoEvento.DEVOLUCAO);
+		evento.setSituacaoAnterior(situacaoAnterior);
+		evento.setSituacaoNova(equipamento.getSituacao());
+		evento.setCondicaoAnterior(condicaoAnterior);
+		evento.setCondicaoNova(equipamento.getCondicao());
 		evento.setObservacao(observacao);
 		historicoRepository.save(evento);
 	}
