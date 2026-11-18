@@ -16,7 +16,7 @@ Este documento acompanha a ligação entre o front (`EquipTrak/frontend`) e esta
 | 1 | Login, sessão, logout e perfil do usuário | Feita |
 | 2 | Equipamentos, por tela do front: 2a lista e cadastro, 2b histórico | Feita |
 | 3 | Solicitações, por tela do front: 3a criar, 3b minhas solicitações e cancelar, 3c fila do operador, aprovar e rejeitar | Feita |
-| 4 | Empréstimos, por tela do front: 4a retirada e 4b devolução (feitas); atraso | Em andamento |
+| 4 | Empréstimos, por tela do front: 4a retirada, 4b devolução e 4c atraso com bloqueio | Feita |
 | 5 | Indicadores do painel, histórico por solicitante e bloqueio por atraso | Pendente |
 
 ### Parte 1: autenticação
@@ -279,7 +279,7 @@ No front:
 - "Confirmar retirada" chama a API e fica desabilitado enquanto ela responde. Os erros aparecem no modal; em 409 e 404, a fila e o catálogo são recarregados.
 - O front combina os dois status (divergência 3): empréstimo `ATIVO` aparece como `RETIRADO`, `ATRASADO` como `ATRASADO` e `DEVOLVIDO` como `DEVOLVIDO`. A aba "Em uso" da fila e "Minhas solicitações" mostram as retiradas.
 - Saiu o evento local "Retirada registrada" da gaveta: o evento vem do backend.
-- O `NB-0002` do perfil `dev` continua nascendo `EMPRESTADO` sem empréstimo, só para a demonstração.
+- No perfil `dev`, o `NB-0002` nasce `EMPRESTADO`; desde a parte 4c ele ganha um empréstimo atrasado de Beatriz Alves.
 
 ### Parte 4b: botão "Registrar devolução" da fila do operador
 
@@ -314,6 +314,29 @@ No front:
 - "Confirmar devolução" chama a API e mostra os erros no modal. O modal ganhou a condição `REGULAR`, e a observação tem limite de 500 caracteres.
 - A solicitação vai para `DEVOLVIDO`, e o equipamento muda de situação e condição na hora.
 - Saíram os eventos locais de devolução e o mapa de eventos locais do serviço: a gaveta mostra só o que vem da API.
+
+### Parte 4c: atrasos e bloqueio por atraso
+
+Esta parte não tem endpoint novo: muda o que as rotas existentes devolvem e recusam.
+
+- **Atraso calculado (RF13, RN07, RN15).** `emprestimo.status` vem `ATRASADO` quando o empréstimo está em aberto e o dia de hoje já passou do dia da devolução prevista. Devolver no próprio dia não é atraso. O dia é contado no fuso da instituição: `equiptrack.fuso-horario` (variável `FUSO_HORARIO`), com padrão `America/Sao_Paulo`. O banco continua gravando `ATIVO`; o `ATRASADO` só aparece na leitura.
+- **Bloqueio por atraso (RF14, RN09).** Enquanto o solicitante tiver empréstimo atrasado:
+
+  | Ação | Resposta |
+  |---|---|
+  | Criar solicitação (`POST /api/solicitacoes`) | 403, com o motivo em `mensagem` |
+  | Aprovar solicitação dele | 409 em `campos.solicitante` |
+  | Registrar retirada para ele | 409 em `campos.solicitante` |
+
+- Para regularizar, basta devolver o equipamento: o bloqueio olha só empréstimos ainda em aberto. Nada é gravado em `solicitante.status`, que continua sendo o bloqueio manual.
+- A exceção do administrador (RF21), a multa e o alerta de atraso ficam para depois, pois não têm tela no front.
+- Bloquear também a criação foi uma escolha, pois o RF14 pede validação: o front já desabilitava "Solicitar" e avisava "Novas solicitações bloqueadas". Se a equipe decidir que a criação deve ser liberada, basta tirar a verificação de `SolicitacaoService.criar`.
+- No perfil `dev`, `EmprestimosDevInitializer` dá ao `NB-0002` um empréstimo de Beatriz Alves vencido há dois dias. Assim, a aba "Atrasados" e o bloqueio podem ser testados logo ao subir. Ele só age se o `NB-0002` estiver `EMPRESTADO` sem empréstimo em aberto, então não volta depois da devolução.
+
+No front:
+
+- A aba "Atrasados" da fila, o indicador "Atrasados" do painel e "Minhas solicitações" passam a mostrar os atrasos vindos da API.
+- Na tela Disponíveis, o solicitante com atraso vê o aviso "Novas solicitações bloqueadas", e o botão "Solicitar" fica desabilitado. A verificação não compara mais o nome do usuário.
 
 ## Contrato das próximas partes
 
