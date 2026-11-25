@@ -15,9 +15,37 @@ navegador ──► frontend (nginx :4200) ──/api──► backend (Spring :
               só esta porta fica aberta         rede interna do compose      volume mysql-dados
 ```
 
+## Avaliar o sistema em um comando
+
+Para testar o EquipTrack sem configurar nada: só precisa do **Docker Desktop** (ou Docker Engine com o Compose v2) e do **Git**.
+
+1. Baixe este repositório e entre na pasta:
+
+   ```bash
+   git clone https://github.com/EquipTrak/backend.git
+   cd backend
+   ```
+
+2. Rode o script de início:
+   - **Windows:** dê dois cliques em `iniciar.cmd` (ou, no PowerShell, `powershell -ExecutionPolicy Bypass -File .\iniciar.ps1`).
+   - **Linux ou macOS:** `./iniciar.sh`
+
+3. Quando aparecer **"EquipTrack no ar"**, abra **http://localhost:4200** (no Windows o navegador abre sozinho) e entre com um dos usuários abaixo. A senha aparece na tela e fica no arquivo `.env`, na linha `EQUIPTRACK_DEMO_SENHA`.
+
+| Usuário | Perfil | O que dá para testar |
+|---|---|---|
+| `marina.souza@equiptrack.local` | Operador | Cadastrar equipamento, aprovar ou rejeitar solicitações, registrar retirada e devolução, painel de indicadores |
+| `rafael.lima@equiptrack.local` | Solicitante | Solicitar equipamento, acompanhar e cancelar as próprias solicitações |
+| `beatriz.alves@equiptrack.local` | Solicitante | Começa com o `NB-0002` em atraso, para ver o bloqueio por atraso |
+| `admin@equiptrack.local` | Administrador | Tudo o que o operador faz |
+
+O script confere se o Docker está rodando (no Windows, abre o Docker Desktop), baixa o repositório do front em `../frontend`, cria o `.env` com senhas aleatórias e os dados de demonstração ligados, constrói as imagens e espera os três serviços ficarem saudáveis. **Na primeira vez leva de 5 a 10 minutos**; depois, menos de um minuto. Pode rodar de novo quando quiser: o `.env` e os dados do banco são mantidos.
+
+Para parar: `docker compose stop`. Para apagar tudo, inclusive o banco: `docker compose down -v`. Se algo der errado, veja [Solução de problemas](#solução-de-problemas).
+
 ## Início rápido com Docker
 
-É o caminho recomendado. Não precisa instalar Java, Node nem MySQL: só o Docker.
+O passo a passo manual, para instalar com os seus próprios valores e sem dados de demonstração. É o caminho recomendado para uso real. Não precisa instalar Java, Node nem MySQL: só o Docker.
 
 ### 1. Pré-requisitos
 
@@ -121,6 +149,7 @@ Definidas no `.env` (modelo em [`.env.example`](.env.example)):
 | `MYSQL_ROOT_PASSWORD` | sim | — | Senha do `root` do MySQL do contêiner |
 | `DB_SENHA` | sim | — | Senha do usuário `equiptrack`, usado pelo backend |
 | `EQUIPTRACK_CHAVE_DESENVOLVEDOR` | sim | — | Chave da gestão de usuários (`/api/usuarios`). **Mínimo de 16 caracteres**, senão o backend não sobe |
+| `EQUIPTRACK_DEMO_SENHA` | não | — | Liga os dados de demonstração (usuários, equipamentos e um empréstimo atrasado), todos com esta senha. Não use em produção |
 | `FUSO_HORARIO` | não | `America/Sao_Paulo` | Fuso que decide em que dia vence um empréstimo |
 | `FRONTEND_PORT` | não | `4200` | Porta do front no seu computador |
 | `BACKEND_PORT` | não | `8080` | Porta do backend (só em `127.0.0.1`) |
