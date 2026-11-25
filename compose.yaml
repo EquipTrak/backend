@@ -40,7 +40,10 @@ services:
       mysql:
         condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: mysql
+      # Com EQUIPTRACK_DEMO_SENHA no .env, liga também o perfil dev: usuários, equipamentos e um empréstimo
+      # atrasado de demonstração, todos com essa senha. Sem ela, o banco começa vazio.
+      SPRING_PROFILES_ACTIVE: mysql${EQUIPTRACK_DEMO_SENHA:+,dev}
+      EQUIPTRACK_DEV_SENHA: ${EQUIPTRACK_DEMO_SENHA:-}
       # allowPublicKeyRetrieval: o usuário do MySQL 8 usa caching_sha2_password; sem isso a primeira conexão
       # pode ser recusada quando o TLS não é negociado. A rede é interna ao compose.
       DB_URL: jdbc:mysql://mysql:3306/equiptrack?allowPublicKeyRetrieval=true

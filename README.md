@@ -15,9 +15,41 @@ navegador ──► frontend (nginx :4200) ──/api──► backend (Spring :
               só esta porta fica aberta         rede interna do compose      volume mysql-dados
 ```
 
+## Avaliar o sistema em um comando
+
+Para testar o EquipTrack sem configurar nada: só precisa do **Docker Desktop** (ou Docker Engine com o Compose v2) e do **Git**.
+
+1. Baixe este repositório e entre na pasta:
+
+   ```bash
+   git clone https://github.com/EquipTrak/backend.git
+   cd backend
+   ```
+
+2. Rode o script de início:
+   - **Windows:** dê dois cliques em `iniciar.cmd` (ou, no PowerShell, `powershell -ExecutionPolicy Bypass -File .\iniciar.ps1`).
+   - **Linux ou macOS:** `./iniciar.sh`
+
+3. Quando aparecer **"EquipTrack no ar"**, abra **http://localhost:4200** (no Windows o navegador abre sozinho) e entre com um dos usuários abaixo.
+
+**Senha de todos: `EquipTrack@2026`**
+
+| Usuário | Perfil | O que dá para testar |
+|---|---|---|
+| `admin@equiptrack.local` | Administrador | Tudo o que o operador faz. Criado pela migration `V3`, existe em qualquer instalação |
+| `marina.souza@equiptrack.local` | Operador | Cadastrar equipamento, aprovar ou rejeitar solicitações, registrar retirada e devolução, painel de indicadores |
+| `rafael.lima@equiptrack.local` | Solicitante | Solicitar equipamento, acompanhar e cancelar as próprias solicitações |
+| `beatriz.alves@equiptrack.local` | Solicitante | Começa com o `NB-0002` em atraso, para ver o bloqueio por atraso |
+
+Os três últimos, os equipamentos de exemplo e o empréstimo atrasado são dados de demonstração, que o script liga no `.env` (`EQUIPTRACK_DEMO_SENHA`).
+
+O script confere se o Docker está rodando (no Windows, abre o Docker Desktop), baixa o repositório do front em `../frontend`, cria o `.env` com senhas aleatórias para o banco e a chave de desenvolvedor e com os dados de demonstração ligados, constrói as imagens e espera os três serviços ficarem saudáveis. **Na primeira vez leva de 5 a 10 minutos**; depois, menos de um minuto. Pode rodar de novo quando quiser: o `.env` e os dados do banco são mantidos.
+
+Para parar: `docker compose stop`. Para apagar tudo, inclusive o banco: `docker compose down -v`. Se algo der errado, veja [Solução de problemas](#solução-de-problemas).
+
 ## Início rápido com Docker
 
-É o caminho recomendado. Não precisa instalar Java, Node nem MySQL: só o Docker.
+O passo a passo manual, para instalar com os seus próprios valores e sem dados de demonstração. É o caminho recomendado para uso real. Não precisa instalar Java, Node nem MySQL: só o Docker.
 
 ### 1. Pré-requisitos
 
@@ -75,30 +107,29 @@ Os três serviços devem aparecer como `healthy`. Se algum não ficar, veja o lo
 docker compose logs backend
 ```
 
-O backend responde em `http://localhost:8080/actuator/health` (retorna `{"status":"UP",...}`). O banco começa **sem usuários**; as categorias de equipamento (Notebook, Projetor, Câmera, Adaptador, Kit) já vêm criadas pelas migrations.
+O backend responde em `http://localhost:8080/actuator/health` (retorna `{"status":"UP",...}`). As migrations já criam as categorias de equipamento (Notebook, Projetor, Câmera, Adaptador, Kit) e o administrador `admin@equiptrack.local`, com a senha `EquipTrack@2026`.
 
-### 6. Criar o primeiro usuário
+### 6. Trocar a senha do administrador e criar usuários
 
-Ainda não dá para entrar: o primeiro usuário é criado pela API de gestão, com a chave `EQUIPTRACK_CHAVE_DESENVOLVEDOR` do seu `.env`.
+A senha do administrador inicial está neste README, então **troque-a em uso real**. A troca e o cadastro de outros usuários são feitos pela API de gestão, com a chave `EQUIPTRACK_CHAVE_DESENVOLVEDOR` do seu `.env` (ainda não há tela para isso).
 
-No Git Bash, Linux ou macOS:
-
-```bash
-curl -X POST http://localhost:8080/api/usuarios -H "X-Chave-Desenvolvedor: SUA-CHAVE" -H "Content-Type: application/json" -d '{"nome":"Administrador","email":"admin@equiptrack.local","senha":"uma-senha-forte","perfil":"ADMINISTRADOR"}'
-```
-
-No PowerShell:
+No PowerShell (no Git Bash, Linux ou macOS, use `curl` com os mesmos cabeçalhos):
 
 ```powershell
-$corpo = @{ nome = 'Administrador'; email = 'admin@equiptrack.local'; senha = 'uma-senha-forte'; perfil = 'ADMINISTRADOR' } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/usuarios -Headers @{ 'X-Chave-Desenvolvedor' = 'SUA-CHAVE' } -ContentType 'application/json; charset=utf-8' -Body $corpo
+$h = @{ 'X-Chave-Desenvolvedor' = 'SUA-CHAVE' }
+# Trocar a senha do administrador (o id dele aparece na listagem)
+Invoke-RestMethod -Uri http://localhost:8080/api/usuarios -Headers $h
+Invoke-RestMethod -Method Patch -Uri http://localhost:8080/api/usuarios/1 -Headers $h -ContentType 'application/json; charset=utf-8' -Body (@{ senha = 'uma-senha-forte' } | ConvertTo-Json)
+# Cadastrar um operador
+$corpo = @{ nome = 'Operador'; email = 'operador@equiptrack.local'; senha = 'outra-senha-forte'; perfil = 'OPERADOR' } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/usuarios -Headers $h -ContentType 'application/json; charset=utf-8' -Body $corpo
 ```
 
 Os perfis são `SOLICITANTE`, `OPERADOR` e `ADMINISTRADOR`. O solicitante exige também `"solicitante":{"tipo":"ALUNO","matricula":"..."}`. A senha tem de 8 a 72 caracteres. Detalhes em [Integração com o front-end](docs/integracao-frontend.md#gestão-de-usuários-pelos-desenvolvedores).
 
 ### 7. Acessar
 
-Abra **http://localhost:4200** e entre com o usuário criado.
+Abra **http://localhost:4200** e entre com `admin@equiptrack.local` (ou com um usuário que você criou).
 
 ### 8. Parar, reiniciar e limpar
 
@@ -121,6 +152,7 @@ Definidas no `.env` (modelo em [`.env.example`](.env.example)):
 | `MYSQL_ROOT_PASSWORD` | sim | — | Senha do `root` do MySQL do contêiner |
 | `DB_SENHA` | sim | — | Senha do usuário `equiptrack`, usado pelo backend |
 | `EQUIPTRACK_CHAVE_DESENVOLVEDOR` | sim | — | Chave da gestão de usuários (`/api/usuarios`). **Mínimo de 16 caracteres**, senão o backend não sobe |
+| `EQUIPTRACK_DEMO_SENHA` | não | — | Liga os dados de demonstração (usuários, equipamentos e um empréstimo atrasado), todos com esta senha. Não use em produção |
 | `FUSO_HORARIO` | não | `America/Sao_Paulo` | Fuso que decide em que dia vence um empréstimo |
 | `FRONTEND_PORT` | não | `4200` | Porta do front no seu computador |
 | `BACKEND_PORT` | não | `8080` | Porta do backend (só em `127.0.0.1`) |
@@ -140,8 +172,9 @@ O schema é versionado em [`src/main/resources/db/migration`](src/main/resources
 
 - `V1__schema_inicial.sql`: as tabelas.
 - `V2__categorias_iniciais.sql`: as cinco categorias; cada uma só entra se ainda não existir.
+- `V3__usuario_administrador.sql`: o administrador inicial, `admin@equiptrack.local` com a senha `EquipTrack@2026`; só entra se esse e-mail ainda não existir.
 
-Um banco criado por versões anteriores (quando o Hibernate criava as tabelas) é reconhecido como a versão 1 e recebe só as migrations seguintes; nenhum dado é alterado. Para mudar o schema, crie `V3__descricao.sql`: nunca edite uma migration já publicada.
+Um banco criado por versões anteriores (quando o Hibernate criava as tabelas) é reconhecido como a versão 1 e recebe só as migrations seguintes. Para mudar o schema, crie `V4__descricao.sql`: nunca edite uma migration já publicada.
 
 ```bash
 docker compose exec mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" equiptrack -e "select version, description, success from flyway_schema_history"'
@@ -214,7 +247,7 @@ SPRING_PROFILES_ACTIVE=mysql ./gradlew bootRun
 
 No PowerShell: `$env:SPRING_PROFILES_ACTIVE='mysql'; .\gradlew.bat bootRun`.
 
-O banco `equiptrack` é criado se não existir e o Flyway aplica as migrations. Sem o perfil `dev`, ele começa sem usuários.
+O banco `equiptrack` é criado se não existir e o Flyway aplica as migrations. Sem o perfil `dev`, ele começa só com o administrador da migration `V3` (`admin@equiptrack.local`, senha `EquipTrack@2026`).
 
 **Dados de demonstração** (só em desenvolvimento): adicione o perfil `dev` e defina a senha deles:
 
