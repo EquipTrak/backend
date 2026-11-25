@@ -89,8 +89,9 @@ else {
 		"MYSQL_ROOT_PASSWORD=$(Gerar-Segredo 24)"
 		"DB_SENHA=$(Gerar-Segredo 24)"
 		"EQUIPTRACK_CHAVE_DESENVOLVEDOR=$(Gerar-Segredo 32)"
-		'# Dados de demonstração (usuários, equipamentos e um empréstimo atrasado), todos com esta senha.'
-		"EQUIPTRACK_DEMO_SENHA=$(Gerar-Segredo 12)"
+		'# Dados de demonstração (usuários, equipamentos e um empréstimo atrasado). É a mesma senha do'
+		'# administrador criado pela migration V3 e está no README, para facilitar a avaliação.'
+		'EQUIPTRACK_DEMO_SENHA=EquipTrack@2026'
 	) -join "`n"
 	# Sem BOM e com quebras de linha LF, como o Docker Compose espera.
 	[IO.File]::WriteAllText((Join-Path $PSScriptRoot '.env'), $conteudo + "`n", (New-Object Text.UTF8Encoding $false))
@@ -121,8 +122,8 @@ if ($senha) {
 	Write-Host '  beatriz.alves@equiptrack.local  Solicitante (começa com o NB-0002 em atraso)'
 }
 else {
-	Write-Host 'O .env não tem EQUIPTRACK_DEMO_SENHA: o banco não tem usuários de demonstração.' -ForegroundColor Yellow
-	Write-Host 'Crie o primeiro usuário como explica o README (passo 6 do início rápido).'
+	Write-Host 'Sem EQUIPTRACK_DEMO_SENHA no .env: só existe o administrador da migration V3.' -ForegroundColor Yellow
+	Write-Host '  admin@equiptrack.local  (senha no README, se ainda não foi trocada)'
 }
 Write-Host ''
 Write-Host 'Para parar:            docker compose stop'

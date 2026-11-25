@@ -45,8 +45,9 @@ else
     echo "MYSQL_ROOT_PASSWORD=$(segredo 24)"
     echo "DB_SENHA=$(segredo 24)"
     echo "EQUIPTRACK_CHAVE_DESENVOLVEDOR=$(segredo 32)"
-    echo '# Dados de demonstração (usuários, equipamentos e um empréstimo atrasado), todos com esta senha.'
-    echo "EQUIPTRACK_DEMO_SENHA=$(segredo 12)"
+    echo '# Dados de demonstração (usuários, equipamentos e um empréstimo atrasado). É a mesma senha do'
+    echo '# administrador criado pela migration V3 e está no README, para facilitar a avaliação.'
+    echo 'EQUIPTRACK_DEMO_SENHA=EquipTrack@2026'
   } > .env
   chmod 600 .env
   echo '.env criado com senhas aleatórias e os dados de demonstração ligados.'
@@ -66,8 +67,8 @@ if [ -n "$senha" ]; then
   echo '  rafael.lima@equiptrack.local    Solicitante'
   echo '  beatriz.alves@equiptrack.local  Solicitante (começa com o NB-0002 em atraso)'
 else
-  echo 'O .env não tem EQUIPTRACK_DEMO_SENHA: o banco não tem usuários de demonstração.'
-  echo 'Crie o primeiro usuário como explica o README (passo 6 do início rápido).'
+  echo 'Sem EQUIPTRACK_DEMO_SENHA no .env: só existe o administrador da migration V3.'
+  echo '  admin@equiptrack.local  (senha no README, se ainda não foi trocada)'
 fi
 printf '\nPara parar:            docker compose stop\n'
 echo 'Para apagar tudo:      docker compose down -v   (apaga também os dados do banco)'
